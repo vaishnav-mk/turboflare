@@ -12,6 +12,8 @@ const withProfile = await readProfile(withPath);
 const withoutProfile = await readProfile(withoutPath);
 const markdown = comparisonMarkdown(withProfile, withoutProfile);
 const outputPath = join("ci-results", "comparison", "comparison.md");
+const withTotal = totalDuration(withProfile.steps);
+const withoutTotal = totalDuration(withoutProfile.steps);
 
 await mkdir(dirname(outputPath), { recursive: true });
 await writeFile(outputPath, markdown);
@@ -21,6 +23,10 @@ if (process.env.GITHUB_STEP_SUMMARY !== undefined) {
 }
 
 if (!withProfile.success || !withoutProfile.success) {
+	process.exit(1);
+}
+
+if (withTotal >= withoutTotal) {
 	process.exit(1);
 }
 
@@ -41,6 +47,7 @@ function comparisonMarkdown(withProfile, withoutProfile) {
 		"",
 		`with turborepo: ${withProfile.success ? "pass" : "fail"}`,
 		`without turborepo: ${withoutProfile.success ? "pass" : "fail"}`,
+		`fastest profile: ${totals.with < totals.without ? "with turborepo" : "without turborepo"}`,
 		"",
 		"| step | with turborepo | without turborepo | delta | % diff | faster |",
 		"| --- | ---: | ---: | ---: | ---: | --- |",

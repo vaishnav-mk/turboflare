@@ -28,6 +28,11 @@ const profiles = {
 	],
 };
 
+const warmups = {
+	"with-turborepo": [{ id: "warmup", label: "warm turborepo cache", command: "pnpm typecheck && pnpm test && pnpm test:integration && pnpm build" }],
+	"without-turborepo": [],
+};
+
 const profileName = process.argv[2];
 const ANSI_PATTERN = /\u001b\[[0-9;]*m/g;
 
@@ -40,7 +45,13 @@ const outputDirectory = join("ci-results", profileName);
 await mkdir(outputDirectory, { recursive: true });
 
 const startedAt = new Date().toISOString();
+const warmupSteps = [];
 const steps = [];
+
+for (const step of warmups[profileName]) {
+	const result = await runStep(step, outputDirectory);
+	warmupSteps.push(result);
+}
 
 for (const step of profiles[profileName]) {
 	const result = await runStep(step, outputDirectory);
@@ -52,7 +63,8 @@ const profile = {
 	name: profileName,
 	startedAt,
 	steps,
-	success: steps.every((step) => step.exitCode === 0),
+	success: [...warmupSteps, ...steps].every((step) => step.exitCode === 0),
+	warmupSteps,
 };
 
 await writeFile(join(outputDirectory, "profile.json"), `${JSON.stringify(profile, null, 2)}\n`);
@@ -117,6 +129,10 @@ function runStep(step, outputDirectory) {
 
 function profileMarkdown(profile) {
 	const lines = [`# ${profile.name}`, "", `status: ${profile.success ? "pass" : "fail"}`, "", "| step | status | duration |", "| --- | --- | --- |"];
+
+	for (const step of profile.warmupSteps) {
+		lines.push(`| ${step.label} | ${step.exitCode === 0 ? "pass" : "fail"} | ${formatDuration(step.durationMs)} |`);
+	}
 
 	for (const step of profile.steps) {
 		lines.push(`| ${step.label} | ${step.exitCode === 0 ? "pass" : "fail"} | ${formatDuration(step.durationMs)} |`);
