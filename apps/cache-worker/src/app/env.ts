@@ -10,6 +10,7 @@ export interface Env {
 	CLEANUP_MAX_DELETE?: string;
 	READ_ONLY?: string;
 	RETENTION_DAYS?: string;
+	TOKEN_DB?: D1Database;
 	TURBO_TOKEN?: string;
 	TURBO_TOKEN_SCOPES?: string;
 }

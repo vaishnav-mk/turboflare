@@ -49,7 +49,7 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
 	}
 
 	const requiredScope = request.method === HttpMethod.Put ? AuthScope.Write : AuthScope.Read;
-	const authContext = authenticateBearer(request, env);
+	const authContext = await authenticateBearer(request, env);
 	if (authContext === null) {
 		return withProtocolHeaders(
 			errorResponse(401, "unauthorized", "Missing or invalid bearer token", {

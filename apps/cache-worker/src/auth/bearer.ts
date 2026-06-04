@@ -3,6 +3,7 @@ import { readBearerToken, timingSafeEqual } from "@turboflare/shared";
 import type { Env } from "../app/env";
 import type { TenantContext } from "../tenancy/types";
 import { ALL_TEAMS, MAX_BEARER_TOKEN_LENGTH } from "./constants";
+import { authenticateD1Token } from "./d1";
 import { parseAllowedTokens, parseScopedTokens } from "./static";
 import { type AuthContext, AuthScope, type StaticTokenRule } from "./types";
 
@@ -10,22 +11,22 @@ let cachedRawTokens: string | undefined;
 let cachedRawScopedTokens: string | undefined;
 let cachedTokenRules: readonly StaticTokenRule[] = [];
 
-export function authenticateBearer(request: Request, env: Env): AuthContext | null {
+export async function authenticateBearer(request: Request, env: Env): Promise<AuthContext | null> {
 	const token = readBearerToken(request);
 	if (token === null || token.length > MAX_BEARER_TOKEN_LENGTH) {
 		return null;
 	}
 
 	const rule = tokenRules(env).find((tokenRule) => timingSafeEqual(token, tokenRule.token));
-	if (rule === undefined) {
-		return null;
+	if (rule !== undefined) {
+		return {
+			allowedTeams: rule.teams,
+			scopes: rule.scopes,
+			tokenId: rule.id ?? "static",
+		};
 	}
 
-	return {
-		allowedTeams: rule.teams,
-		scopes: rule.scopes,
-		tokenId: rule.id ?? "static",
-	};
+	return authenticateD1Token(env, token);
 }
 
 export function hasScope(authContext: AuthContext, scope: AuthScope): boolean {
