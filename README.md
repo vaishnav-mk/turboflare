@@ -37,6 +37,7 @@ Current implementation details:
 - Read-only mode rejects uploads while preserving read/status/event compatibility.
 - Optional Cache API reads are available after auth with synthetic artifact keys.
 - Optional Analytics Engine metrics are emitted without blocking cache requests.
+- Optional Rate Limiting binding enforcement keys limits by team and token.
 - Scheduled R2 cleanup can remove expired artifacts under the versioned key prefix.
 - `/internal/*` routes are separated from Turbo bearer auth and protected by Cloudflare Access JWT verification.
 
@@ -118,6 +119,7 @@ Optional Worker variables and bindings:
 - `CACHE_API_READS=true` enables authenticated Cache API reads with synthetic artifact keys.
 - `CACHE_API_MAX_BYTES` controls the largest artifact eligible for Cache API fill. The default is `10485760`.
 - `ANALYTICS` can be bound to Analytics Engine for non-blocking request metrics.
+- `RATE_LIMITER` can be bound to Cloudflare Workers Rate Limiting. It is enforced after auth with keys shaped as `team:{teamKey}:token:{tokenId}`.
 - `INTERNAL_ACCESS_BYPASS=true` allows `/internal/*` routes in local tests only. Do not use it for public deployments.
 - `INTERNAL_ACCESS_TEAM_DOMAIN` is your Access team domain, for example `https://example.cloudflareaccess.com`.
 - `INTERNAL_ACCESS_AUD` is the Access application audience tag. Comma-separated values are accepted.

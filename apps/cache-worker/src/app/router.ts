@@ -6,6 +6,7 @@ import { authenticateBearer, canAccessTenant, hasScope } from "../auth/bearer";
 import { AuthScope } from "../auth/types";
 import { recordMetric } from "../observability/metrics";
 import { MetricEvent } from "../observability/types";
+import { enforceRateLimit } from "../rate-limit/enforce";
 import { handleHealth } from "../routes/internal/health";
 import { handleInternal } from "../routes/internal/router";
 import { handleArtifact } from "../routes/v8/artifacts";
@@ -62,16 +63,26 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
 	}
 
 	if (url.pathname === ARTIFACT_STATUS_PATH) {
-		return withProtocolHeaders(handleStatus(request, env, ctx));
-	}
+		const rateLimitError = await enforceRateLimit(env, authContext, null);
+		if (rateLimitError !== null) {
+			return withProtocolHeaders(rateLimitError);
+		}
 
-	if (url.pathname === ARTIFACT_EVENTS_PATH) {
-		return withProtocolHeaders(await handleEvents(request, env, ctx));
+		return withProtocolHeaders(handleStatus(request, env, ctx));
 	}
 
 	const tenant = resolveTenant(url);
 	if (!canAccessTenant(authContext, tenant)) {
 		return withProtocolHeaders(errorResponse(403, "forbidden", "Token cannot access this team"));
+	}
+
+	const rateLimitError = await enforceRateLimit(env, authContext, tenant);
+	if (rateLimitError !== null) {
+		return withProtocolHeaders(rateLimitError);
+	}
+
+	if (url.pathname === ARTIFACT_EVENTS_PATH) {
+		return withProtocolHeaders(await handleEvents(request, env, ctx));
 	}
 
 	if (url.pathname === ARTIFACTS_PATH || url.pathname === `${ARTIFACTS_PATH}/`) {

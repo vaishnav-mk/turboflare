@@ -234,6 +234,28 @@ describe("cache worker", () => {
 		expect(response.headers.get("access-control-allow-headers")).toContain("x-artifact-duration");
 	});
 
+	it("rejects rate-limited artifact requests", async ({ expect }) => {
+		let key = "";
+		const rateLimiter = {
+			limit: async (input: { key: string }) => {
+				key = input.key;
+				return { success: false };
+			},
+		};
+
+		const response = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${randomArtifactId()}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, RATE_LIMITER: rateLimiter as unknown as RateLimit, TURBO_TOKEN: TOKEN },
+			createExecutionContext()
+		);
+
+		expect(response.status).toBe(429);
+		expect(key).toBe(`team:${TEAM_ID}:token:static-0`);
+		expect(await response.json()).toEqual({
+			error: { code: "rate_limited", message: "Rate limit exceeded" },
+		});
+	});
+
 	it("streams artifact uploads and downloads through R2", async ({ expect }) => {
 		const artifactId = randomArtifactId();
 		const body = new Uint8Array([1, 2, 3, 4, 5]);

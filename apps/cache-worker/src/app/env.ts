@@ -12,6 +12,7 @@ export interface Env {
 	INTERNAL_ACCESS_JWKS_URL?: string;
 	INTERNAL_ACCESS_TEAM_DOMAIN?: string;
 	CLEANUP_MAX_DELETE?: string;
+	RATE_LIMITER?: RateLimit;
 	READ_ONLY?: string;
 	RETENTION_DAYS?: string;
 	TOKEN_DB?: D1Database;
