@@ -2,6 +2,8 @@ import { env as workerEnv } from "cloudflare:workers";
 import { SELF, createExecutionContext, reset } from "cloudflare:test";
 import { afterEach, describe, it } from "vitest";
 
+import { CacheStatus } from "@turboflare/protocol";
+
 import { handleRequest, type Env } from "../src";
 
 const BASE_URL = "https://cache.turboflare.test";
@@ -41,6 +43,31 @@ describe("cache worker", () => {
 
 		expect(response.status).toBe(200);
 		expect(await response.json()).toEqual({ status: "enabled" });
+	});
+
+	it("reports configured cache status variants", async ({ expect }) => {
+		for (const status of Object.values(CacheStatus)) {
+			const response = await handleRequest(
+				new Request(`${BASE_URL}/v8/artifacts/status`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+				{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, CACHE_STATUS: status, TURBO_TOKEN: TOKEN },
+				createExecutionContext()
+			);
+
+			expect(response.status).toBe(200);
+			expect(await response.json()).toEqual({ status });
+		}
+	});
+
+	it("rejects invalid bearer tokens consistently", async ({ expect }) => {
+		const response = await fetchAuthed("/v8/artifacts/status", {}, "bad-token");
+
+		expect(response.status).toBe(401);
+		expect(await response.json()).toEqual({
+			error: {
+				code: "unauthorized",
+				message: "Missing or invalid bearer token",
+			},
+		});
 	});
 
 	it("accepts comma-separated bearer token allowlists", async ({ expect }) => {
@@ -120,6 +147,104 @@ describe("cache worker", () => {
 		expect(head.headers.get("x-artifact-duration")).toBe("1234");
 	});
 
+	it("accepts incremental artifact ids", async ({ expect }) => {
+		const artifactId = `incremental-${"a".repeat(64)}`;
+		const body = new Uint8Array([9, 9, 9]);
+
+		const put = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+			method: "PUT",
+			headers: {
+				"Content-Type": "application/octet-stream",
+				"x-artifact-duration": "0",
+			},
+			body,
+		});
+
+		expect(put.status).toBe(200);
+
+		const get = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`);
+		expect(get.status).toBe(200);
+		expect(new Uint8Array(await get.arrayBuffer())).toEqual(body);
+
+		const lookup = await fetchAuthed(`/v8/artifacts?teamId=${TEAM_ID}`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ hashes: [artifactId] }),
+		});
+
+		expect(await lookup.json()).toEqual({
+			[artifactId]: { size: body.byteLength, taskDurationMs: 0 },
+		});
+	});
+
+	it("rejects unsupported upload content types", async ({ expect }) => {
+		const response = await fetchAuthed(`/v8/artifacts/${randomArtifactId()}?teamId=${TEAM_ID}`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: new Uint8Array([1]),
+		});
+
+		expect(response.status).toBe(400);
+		expect(await response.json()).toEqual({
+			error: {
+				code: "bad_request",
+				message: "Artifact upload must use application/octet-stream",
+			},
+		});
+	});
+
+	it("treats duplicate puts as last-writer-wins", async ({ expect }) => {
+		const artifactId = randomArtifactId();
+
+		const first = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/octet-stream", "x-artifact-duration": "1", "x-artifact-tag": "first" },
+			body: new Uint8Array([1]),
+		});
+		const second = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/octet-stream", "x-artifact-duration": "2", "x-artifact-tag": "second" },
+			body: new Uint8Array([2, 2]),
+		});
+
+		expect(first.status).toBe(200);
+		expect(second.status).toBe(200);
+
+		const get = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`);
+		expect(get.headers.get("x-artifact-duration")).toBe("2");
+		expect(get.headers.get("x-artifact-tag")).toBe("second");
+		expect(new Uint8Array(await get.arrayBuffer())).toEqual(new Uint8Array([2, 2]));
+	});
+
+	it("handles R2 objects without custom metadata", async ({ expect }) => {
+		const artifactId = randomArtifactId();
+		await (workerEnv as unknown as Env).ARTIFACTS.put(`v1/team/${TEAM_ID}/artifact/${artifactId}`, new Uint8Array([1, 2]), {
+			httpMetadata: { contentType: "application/octet-stream" },
+		});
+
+		const get = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`);
+		expect(get.status).toBe(200);
+		expect(get.headers.get("x-artifact-duration")).toBe("0");
+		expect(new Uint8Array(await get.arrayBuffer())).toEqual(new Uint8Array([1, 2]));
+	});
+
+	it("rejects oversized object keys", async ({ expect }) => {
+		const artifactId = "x".repeat(1_200);
+		const response = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/octet-stream" },
+			body: new Uint8Array([1]),
+		});
+
+		expect(response.status).toBe(400);
+		expect(await response.json()).toEqual({
+			error: {
+				code: "bad_request",
+				message: "Artifact key is too long",
+			},
+		});
+	});
+
 	it("returns misses without touching response bodies", async ({ expect }) => {
 		const artifactId = randomArtifactId();
 
@@ -173,6 +298,23 @@ describe("cache worker", () => {
 				message: "Remote cache is running in read-only mode",
 			},
 		});
+	});
+
+	it("allows reads in read-only mode", async ({ expect }) => {
+		const artifactId = randomArtifactId();
+		await (workerEnv as unknown as Env).ARTIFACTS.put(`v1/team/${TEAM_ID}/artifact/${artifactId}`, new Uint8Array([1]), {
+			httpMetadata: { contentType: "application/octet-stream" },
+			customMetadata: { duration: "0" },
+		});
+
+		const ctx = createExecutionContext();
+		const get = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, READ_ONLY: "true", TURBO_TOKEN: TOKEN },
+			ctx
+		);
+
+		expect(get.status).toBe(200);
 	});
 
 	it("rejects scoped tokens without write scope", async ({ expect }) => {
@@ -257,6 +399,35 @@ describe("cache worker", () => {
 		expect(new Uint8Array(await get.arrayBuffer())).toEqual(body);
 	});
 
+	it("scopes slug and teamId to separate R2 keys", async ({ expect }) => {
+		const artifactId = randomArtifactId();
+		await fetchAuthed(`/v8/artifacts/${artifactId}?slug=docs`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/octet-stream" },
+			body: new Uint8Array([1]),
+		});
+		await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=team_docs`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/octet-stream" },
+			body: new Uint8Array([2]),
+		});
+
+		const slugObject = await (workerEnv as unknown as Env).ARTIFACTS.head(`v1/team/docs/artifact/${artifactId}`);
+		const teamIdObject = await (workerEnv as unknown as Env).ARTIFACTS.head(`v1/team/team_docs/artifact/${artifactId}`);
+		expect(slugObject).not.toBeNull();
+		expect(teamIdObject).not.toBeNull();
+	});
+
+	it("ignores x-ai-agent safely", async ({ expect }) => {
+		const response = await fetchAuthed(`/v8/artifacts/${randomArtifactId()}?teamId=${TEAM_ID}`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/octet-stream", "x-ai-agent": "agent" },
+			body: new Uint8Array([1]),
+		});
+
+		expect(response.status).toBe(200);
+	});
+
 	it("returns artifact lookup hits and misses", async ({ expect }) => {
 		const artifactId = randomArtifactId();
 		const missingArtifactId = randomArtifactId();
@@ -321,6 +492,19 @@ describe("cache worker", () => {
 
 		expect(response.status).toBe(200);
 		expect(await response.json()).toEqual({ accepted: true });
+	});
+
+	it("accepts event variants with and without session ids", async ({ expect }) => {
+		const response = await fetchAuthed(`/v8/artifacts/events?teamId=${TEAM_ID}`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify([
+				{ event: "HIT", hash: randomArtifactId(), source: "REMOTE", duration: 1, sessionId: crypto.randomUUID() },
+				{ event: "MISS", hash: randomArtifactId(), source: "LOCAL", duration: 0 },
+			]),
+		});
+
+		expect(response.status).toBe(200);
 	});
 });
 
