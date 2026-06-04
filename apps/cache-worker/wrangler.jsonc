@@ -1,0 +1,14 @@
+{
+	"name": "turboflare-cache-worker",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-05-07",
+	"vars": {
+		"CACHE_STATUS": "enabled"
+	},
+	"r2_buckets": [
+		{
+			"binding": "ARTIFACTS",
+			"bucket_name": "turboflare-artifacts"
+		}
+	]
+}
