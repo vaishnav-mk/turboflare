@@ -7,6 +7,7 @@ import { AuthScope } from "../auth/types";
 import { recordMetric } from "../observability/metrics";
 import { MetricEvent } from "../observability/types";
 import { enforceRateLimit } from "../rate-limit/enforce";
+import { handleVercelCompatibility } from "../routes/compat/vercel";
 import { handleHealth } from "../routes/internal/health";
 import { handleInternal } from "../routes/internal/router";
 import { handleArtifact } from "../routes/v8/artifacts";
@@ -38,6 +39,11 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
 	const internal = await handleInternal(request, env);
 	if (internal !== null) {
 		return internal;
+	}
+
+	const compat = await handleVercelCompatibility(request, env);
+	if (compat !== null) {
+		return compat;
 	}
 
 	if (!url.pathname.startsWith(`${TURBO_API_PREFIX}/`)) {

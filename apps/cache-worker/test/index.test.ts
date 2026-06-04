@@ -181,6 +181,59 @@ describe("cache worker", () => {
 		});
 	});
 
+	it("serves Turbo user and team compatibility metadata", async ({ expect }) => {
+		const user = await fetchAuthed("/v2/user");
+		expect(user.status).toBe(200);
+		expect(await user.json()).toEqual({
+			user: {
+				email: "static-0@turboflare.local",
+				id: "static-0",
+				name: "Turboflare User",
+				username: "static-0",
+			},
+		});
+
+		const teams = await handleRequest(
+			new Request(`${BASE_URL}/v2/teams`, { headers: { Authorization: `Bearer ${SCOPED_WRITE_TOKEN}` } }),
+			scopedEnv(),
+			createExecutionContext()
+		);
+		expect(teams.status).toBe(200);
+		expect(await teams.json()).toEqual({
+			teams: [
+				{
+					created: "1970-01-01T00:00:00.000Z",
+					createdAt: 0,
+					id: TEAM_ID,
+					membership: { role: "OWNER" },
+					name: "turboflare",
+					slug: "turboflare",
+				},
+			],
+		});
+
+		const team = await handleRequest(
+			new Request(`${BASE_URL}/v2/teams/${TEAM_ID}`, { headers: { Authorization: `Bearer ${SCOPED_WRITE_TOKEN}` } }),
+			scopedEnv(),
+			createExecutionContext()
+		);
+		expect(team.status).toBe(200);
+		expect(await team.json()).toMatchObject({ id: TEAM_ID, slug: "turboflare" });
+	});
+
+	it("rejects compatibility metadata for unauthorized teams", async ({ expect }) => {
+		const response = await handleRequest(
+			new Request(`${BASE_URL}/v2/teams/${OTHER_TEAM_ID}`, { headers: { Authorization: `Bearer ${SCOPED_WRITE_TOKEN}` } }),
+			scopedEnv(),
+			createExecutionContext()
+		);
+
+		expect(response.status).toBe(403);
+		expect(await response.json()).toEqual({
+			error: { code: "forbidden", message: "Token cannot access this team" },
+		});
+	});
+
 	it("reports enabled cache status", async ({ expect }) => {
 		const response = await fetchAuthed("/v8/artifacts/status");
 

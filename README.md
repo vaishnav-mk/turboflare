@@ -41,6 +41,7 @@ Current implementation details:
 - Optional D1 artifact indexing records upload metadata for larger installations.
 - Scheduled R2 cleanup can remove expired artifacts under the versioned key prefix.
 - `/internal/*` routes are separated from Turbo bearer auth and protected by Cloudflare Access JWT verification.
+- Lightweight `/v2/user`, `/v2/teams`, and `/v2/teams/:id` compatibility routes support Turbo user/team discovery with existing bearer tokens.
 
 Local research and planning docs live under `docs/` and are intentionally ignored until they are ready to publish.
 
@@ -104,6 +105,8 @@ create table tokens (
 ```
 
 `token_hash` is the lowercase hex SHA-256 of the raw token. `teams` and `scopes` are JSON arrays, for example `teams = ["team_turboflare"]` and `scopes = ["read", "write"]`.
+
+Tracked SQL setup files are available under `apps/cache-worker/schema/`.
 
 For optional artifact indexing, bind `ARTIFACT_INDEX` and create this table:
 
