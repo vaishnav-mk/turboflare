@@ -74,7 +74,7 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
 		return withProtocolHeaders(errorResponse(404, "not_found", "Not found"));
 	}
 
-	return withProtocolHeaders(await handleArtifact(request, env, tenant, artifactId, authContext));
+	return withProtocolHeaders(await handleArtifact(request, env, ctx, tenant, artifactId, authContext));
 }
 
 function parseArtifactId(pathname: string): string | null {

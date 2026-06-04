@@ -49,6 +49,7 @@ export function artifactResponseHeaders(object: R2Object | R2ObjectBody): Header
 	headers.set("Content-Type", object.httpMetadata?.contentType ?? OCTET_STREAM);
 	headers.set("Content-Length", object.size.toString());
 	headers.set("ETag", object.httpEtag);
+	headers.set("Last-Modified", object.uploaded.toUTCString());
 	headers.set(ArtifactHeader.Duration, metadata.duration ?? "0");
 	setHeader(headers, ArtifactHeader.Tag, metadata.tag);
 	setHeader(headers, ArtifactHeader.Sha, metadata.sha);

@@ -1,10 +1,11 @@
 import { env as workerEnv } from "cloudflare:workers";
-import { SELF, createExecutionContext, reset } from "cloudflare:test";
+import { SELF, createExecutionContext, reset, waitOnExecutionContext } from "cloudflare:test";
 import { afterEach, describe, it } from "vitest";
 
 import { CacheStatus } from "@turboflare/protocol";
 
 import { handleRequest, type Env } from "../src";
+import { artifactCache, cacheRequest } from "../src/storage/cache-api";
 
 const BASE_URL = "https://cache.turboflare.test";
 const TOKEN = "test-token";
@@ -255,6 +256,112 @@ describe("cache worker", () => {
 		const head = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { method: "HEAD" });
 		expect(head.status).toBe(404);
 		expect(await head.text()).toBe("");
+	});
+
+	it("serves authenticated cache api hits after R2 fill", async ({ expect }) => {
+		const artifactId = randomArtifactId();
+		const key = `v1/team/${TEAM_ID}/artifact/${artifactId}`;
+		await (workerEnv as unknown as Env).ARTIFACTS.put(key, new Uint8Array([7]), {
+			httpMetadata: { contentType: "application/octet-stream" },
+			customMetadata: { duration: "7", tag: "cached" },
+		});
+
+		const fillCtx = createExecutionContext();
+		const first = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, CACHE_API_READS: "true", TURBO_TOKEN: TOKEN },
+			fillCtx
+		);
+		await waitOnExecutionContext(fillCtx);
+		expect(first.status).toBe(200);
+
+		await (workerEnv as unknown as Env).ARTIFACTS.delete(key);
+
+		const cached = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, CACHE_API_READS: "true", TURBO_TOKEN: TOKEN },
+			createExecutionContext()
+		);
+
+		expect(cached.status).toBe(200);
+		expect(cached.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+		expect(cached.headers.get("cache-tag")).toBe(`artifact:${key.replaceAll("/", ":")}`);
+		expect(cached.headers.get("x-artifact-tag")).toBe("cached");
+		expect(new Uint8Array(await cached.arrayBuffer())).toEqual(new Uint8Array([7]));
+		expect(await artifactCache().match(cacheRequest(key))).not.toBeUndefined();
+	});
+
+	it("keeps cache api entries scoped by team", async ({ expect }) => {
+		const artifactId = randomArtifactId();
+		await (workerEnv as unknown as Env).ARTIFACTS.put(`v1/team/${TEAM_ID}/artifact/${artifactId}`, new Uint8Array([1]), {
+			httpMetadata: { contentType: "application/octet-stream" },
+			customMetadata: { duration: "0" },
+		});
+		await (workerEnv as unknown as Env).ARTIFACTS.put(`v1/team/${OTHER_TEAM_ID}/artifact/${artifactId}`, new Uint8Array([2]), {
+			httpMetadata: { contentType: "application/octet-stream" },
+			customMetadata: { duration: "0" },
+		});
+
+		const firstCtx = createExecutionContext();
+		const secondCtx = createExecutionContext();
+		await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, CACHE_API_READS: "true", TURBO_TOKEN: TOKEN },
+			firstCtx
+		);
+		await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${OTHER_TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, CACHE_API_READS: "true", TURBO_TOKEN: TOKEN },
+			secondCtx
+		);
+		await waitOnExecutionContext(firstCtx);
+		await waitOnExecutionContext(secondCtx);
+
+		await (workerEnv as unknown as Env).ARTIFACTS.delete(`v1/team/${TEAM_ID}/artifact/${artifactId}`);
+		await (workerEnv as unknown as Env).ARTIFACTS.delete(`v1/team/${OTHER_TEAM_ID}/artifact/${artifactId}`);
+
+		const first = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, CACHE_API_READS: "true", TURBO_TOKEN: TOKEN },
+			createExecutionContext()
+		);
+		const second = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${OTHER_TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, CACHE_API_READS: "true", TURBO_TOKEN: TOKEN },
+			createExecutionContext()
+		);
+
+		expect(new Uint8Array(await first.arrayBuffer())).toEqual(new Uint8Array([1]));
+		expect(new Uint8Array(await second.arrayBuffer())).toEqual(new Uint8Array([2]));
+	});
+
+	it("skips cache api fill above size threshold", async ({ expect }) => {
+		const artifactId = randomArtifactId();
+		const key = `v1/team/${TEAM_ID}/artifact/${artifactId}`;
+		await (workerEnv as unknown as Env).ARTIFACTS.put(key, new Uint8Array([1, 2]), {
+			httpMetadata: { contentType: "application/octet-stream" },
+			customMetadata: { duration: "0" },
+		});
+
+		const ctx = createExecutionContext();
+		const first = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, CACHE_API_MAX_BYTES: "1", CACHE_API_READS: "true", TURBO_TOKEN: TOKEN },
+			ctx
+		);
+		await waitOnExecutionContext(ctx);
+		expect(first.status).toBe(200);
+		expect(await artifactCache().match(cacheRequest(key))).toBeUndefined();
+
+		await (workerEnv as unknown as Env).ARTIFACTS.delete(key);
+
+		const miss = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, CACHE_API_MAX_BYTES: "1", CACHE_API_READS: "true", TURBO_TOKEN: TOKEN },
+			createExecutionContext()
+		);
+
+		expect(miss.status).toBe(404);
 	});
 
 	it("rejects invalid artifact duration metadata", async ({ expect }) => {
