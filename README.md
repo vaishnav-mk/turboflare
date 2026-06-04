@@ -109,6 +109,10 @@ Access-protected token admin routes are available when `TOKEN_DB` is bound:
 - `POST /internal/tokens` creates a token from `{ "teams": ["team_turboflare"], "scopes": ["read", "write"] }` and returns the raw token once.
 - `POST /internal/tokens/:id/revoke` marks a token revoked without deleting its audit row.
 
+Access-protected artifact admin routes are also available:
+
+- `POST /internal/artifacts/purge-expired` runs the same bounded retention cleanup as the scheduled Worker.
+
 Optional Worker variables and bindings:
 
 - `CACHE_API_READS=true` enables authenticated Cache API reads with synthetic artifact keys.

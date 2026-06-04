@@ -2,6 +2,7 @@ import { errorResponse, methodNotAllowed } from "@turboflare/shared";
 
 import type { Env } from "../../app/env";
 import { requireAccess } from "../../auth/access";
+import { handleInternalArtifacts } from "./artifacts";
 import { handleInternalHealth } from "./health";
 import { handleInternalTeam } from "./team";
 import { handleInternalTokens } from "./tokens";
@@ -25,6 +26,11 @@ export async function handleInternal(request: Request, env: Env): Promise<Respon
 	const team = await handleInternalTeam(request, env);
 	if (team !== null) {
 		return team;
+	}
+
+	const artifacts = await handleInternalArtifacts(request, env);
+	if (artifacts !== null) {
+		return artifacts;
 	}
 
 	const tokens = await handleInternalTokens(request, env);

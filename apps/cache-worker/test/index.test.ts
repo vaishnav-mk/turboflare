@@ -141,6 +141,21 @@ describe("cache worker", () => {
 		expect(tokenDb.rows.get("ci-token")?.revoked_at).toEqual(expect.any(String));
 	});
 
+	it("purges expired artifacts through the internal route", async ({ expect }) => {
+		const bucket = new RouteCleanupBucket([
+			{ key: `v1/team/${TEAM_ID}/artifact/old`, uploaded: daysAgo(40) },
+			{ key: `v1/team/${TEAM_ID}/artifact/new`, uploaded: daysAgo(1) },
+			{ key: `legacy/team/${TEAM_ID}/artifact/old`, uploaded: daysAgo(40) },
+		]);
+		const env = { ARTIFACTS: bucket as unknown as R2Bucket, INTERNAL_ACCESS_BYPASS: "true", RETENTION_DAYS: "30" } satisfies Env;
+
+		const response = await handleRequest(new Request(`${BASE_URL}/internal/artifacts/purge-expired`, { method: "POST" }), env, createExecutionContext());
+
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ deleted: 1, scanned: 2 });
+		expect(bucket.deleted).toEqual([`v1/team/${TEAM_ID}/artifact/old`]);
+	});
+
 	it("requires token database for internal token routes", async ({ expect }) => {
 		const response = await handleRequest(
 			new Request(`${BASE_URL}/internal/tokens`),
@@ -807,6 +822,40 @@ interface TokenAdminRow {
 	token_hash: string;
 }
 
+interface RouteCleanupObject {
+	key: string;
+	uploaded: Date;
+}
+
+class RouteCleanupBucket {
+	readonly deleted: string[] = [];
+
+	constructor(private readonly objects: RouteCleanupObject[]) {}
+
+	async list(options: R2ListOptions): Promise<R2Objects> {
+		const filtered = this.objects.filter((object) => object.key.startsWith(options.prefix ?? ""));
+		return {
+			delimitedPrefixes: [],
+			objects: filtered.map((object) => ({
+				checksums: {} as R2Checksums,
+				etag: object.key,
+				httpEtag: `"${object.key}"`,
+				key: object.key,
+				size: 1,
+				storageClass: "Standard",
+				uploaded: object.uploaded,
+				version: object.key,
+				writeHttpMetadata() {},
+			})) as unknown as R2Object[],
+			truncated: false,
+		};
+	}
+
+	async delete(keys: string | string[]): Promise<void> {
+		this.deleted.push(...(Array.isArray(keys) ? keys : [keys]));
+	}
+}
+
 class TokenAdminDb {
 	readonly rows = new Map<string, TokenAdminRow>();
 
@@ -881,4 +930,8 @@ function base64Url(value: string | ArrayBuffer): string {
 	}
 
 	return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+}
+
+function daysAgo(days: number): Date {
+	return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 }
