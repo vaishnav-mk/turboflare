@@ -41,6 +41,7 @@ interface TokenRow {
 type TokenResult = { error: string } | { token: CreatedToken };
 
 const CREATE_TOKEN_QUERY = "insert into tokens (id, token_hash, teams, scopes, expires_at, revoked_at) values (?, ?, ?, ?, ?, null)";
+const INSERT_AUDIT_QUERY = "insert into token_audit (id, token_id, action, created_at) values (?, ?, ?, ?)";
 const LIST_TOKENS_QUERY = "select id, teams, scopes, expires_at, revoked_at from tokens order by id";
 const REVOKE_TOKEN_QUERY = "update tokens set revoked_at = ? where id = ? and revoked_at is null";
 
@@ -67,6 +68,7 @@ export async function createToken(env: Env, input: CreateTokenInput): Promise<To
 	await env.TOKEN_DB.prepare(CREATE_TOKEN_QUERY)
 		.bind(parsed.id, tokenHash, JSON.stringify(parsed.teams), JSON.stringify(parsed.scopes), parsed.expiresAt)
 		.run();
+	await auditTokenAction(env, parsed.id, "create");
 
 	return { token: { expiresAt: parsed.expiresAt, id: parsed.id, revokedAt: null, scopes: parsed.scopes, teams: parsed.teams, token: parsed.token } };
 }
@@ -78,7 +80,12 @@ export async function revokeToken(env: Env, tokenId: string, now = new Date()): 
 
 	const revokedAt = now.toISOString();
 	await env.TOKEN_DB.prepare(REVOKE_TOKEN_QUERY).bind(revokedAt, tokenId).run();
+	await auditTokenAction(env, tokenId, "revoke", now);
 	return { id: tokenId, revokedAt };
+}
+
+async function auditTokenAction(env: Env, tokenId: string, action: "create" | "revoke", now = new Date()): Promise<void> {
+	await env.TOKEN_DB?.prepare(INSERT_AUDIT_QUERY).bind(crypto.randomUUID(), tokenId, action, now.toISOString()).run();
 }
 
 function parseCreateToken(input: CreateTokenInput): Omit<CreatedToken, "revokedAt"> | string {

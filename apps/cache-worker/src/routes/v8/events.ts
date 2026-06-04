@@ -21,10 +21,27 @@ export async function handleEvents(request: Request, env: Env, ctx: ExecutionCon
 		return errorResponse(400, "bad_request", "Events request body must be JSON");
 	}
 
+	if (!isEventArray(events)) {
+		return errorResponse(400, "bad_request", "Events request body must be an array of Turbo cache events");
+	}
+
 	ctx.waitUntil(recordEvents(events));
 	recordMetric(env, ctx, { event: MetricEvent.Events, method: request.method, status: 200 });
 	return jsonResponse({ accepted: true });
 }
 
 async function recordEvents(_events: unknown): Promise<void> {
+}
+
+function isEventArray(value: unknown): value is readonly unknown[] {
+	return Array.isArray(value) && value.every(isEvent);
+}
+
+function isEvent(value: unknown): boolean {
+	if (typeof value !== "object" || value === null) {
+		return false;
+	}
+
+	const event = value as Record<string, unknown>;
+	return (event.event === "HIT" || event.event === "MISS") && (event.source === "LOCAL" || event.source === "REMOTE") && typeof event.hash === "string" && typeof event.duration === "number" && event.duration >= 0;
 }

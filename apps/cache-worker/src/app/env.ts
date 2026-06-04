@@ -13,6 +13,7 @@ export interface Env {
 	INTERNAL_ACCESS_JWKS_URL?: string;
 	INTERNAL_ACCESS_TEAM_DOMAIN?: string;
 	CLEANUP_MAX_DELETE?: string;
+	MAX_ARTIFACT_BYTES?: string;
 	RATE_LIMITER?: RateLimit;
 	READ_ONLY?: string;
 	RETENTION_DAYS?: string;
@@ -31,6 +32,7 @@ export interface AppConfig {
 	internalAccessJwksUrl?: string;
 	internalAccessTeamDomain?: string;
 	cleanupMaxDelete: number;
+	maxArtifactBytes: number;
 	readOnly: boolean;
 	retentionDays: number;
 }
@@ -50,6 +52,7 @@ export function appConfig(env: Env): AppConfig {
 		internalAccessJwksUrl: nonEmptyValue(env.INTERNAL_ACCESS_JWKS_URL),
 		internalAccessTeamDomain: normalizeAccessTeamDomain(env.INTERNAL_ACCESS_TEAM_DOMAIN),
 		cleanupMaxDelete: numberValue(env.CLEANUP_MAX_DELETE, DEFAULT_CLEANUP_MAX_DELETE),
+		maxArtifactBytes: numberValue(env.MAX_ARTIFACT_BYTES, 0),
 		readOnly: isTruthy(env.READ_ONLY),
 		retentionDays: numberValue(env.RETENTION_DAYS, DEFAULT_RETENTION_DAYS),
 	};

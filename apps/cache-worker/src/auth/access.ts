@@ -60,6 +60,10 @@ export async function requireAccess(request: Request, env: Env): Promise<Respons
 	}
 
 	const keys = await accessKeys(env, config.internalAccessTeamDomain);
+	if (keys === null) {
+		return errorResponse(503, "unavailable", "Cloudflare Access certs unavailable");
+	}
+
 	if (keys.length === 0 || !(await verifyJwt(parsed, keys)) || !validClaims(parsed.payload, config.internalAccessTeamDomain, config.internalAccessAudiences)) {
 		return errorResponse(403, "forbidden", "Invalid Cloudflare Access assertion");
 	}
@@ -67,7 +71,7 @@ export async function requireAccess(request: Request, env: Env): Promise<Respons
 	return null;
 }
 
-async function accessKeys(env: Env, teamDomain: string): Promise<readonly AccessJsonWebKey[]> {
+async function accessKeys(env: Env, teamDomain: string): Promise<readonly AccessJsonWebKey[] | null> {
 	const config = appConfig(env);
 	if (config.internalAccessJwks !== undefined) {
 		return parseJwks(config.internalAccessJwks);
@@ -78,9 +82,15 @@ async function accessKeys(env: Env, teamDomain: string): Promise<readonly Access
 		return cachedJwksKeys;
 	}
 
-	const response = await fetch(url);
+	let response: Response;
+	try {
+		response = await fetch(url);
+	} catch {
+		return null;
+	}
+
 	if (!response.ok) {
-		return [];
+		return null;
 	}
 
 	const keys = parseJwks(await response.text());

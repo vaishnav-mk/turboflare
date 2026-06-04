@@ -29,8 +29,14 @@ export async function handleArtifact(request: Request, env: Env, ctx: ExecutionC
 }
 
 async function putArtifact(request: Request, env: Env, ctx: ExecutionContext, tenant: TenantContext, artifactId: string, authContext: AuthContext): Promise<Response> {
-	if (appConfig(env).readOnly) {
+	const config = appConfig(env);
+	if (config.readOnly) {
 		return errorResponse(403, "forbidden", "Remote cache is running in read-only mode");
+	}
+
+	const contentLength = numberHeader(request.headers.get("Content-Length"));
+	if (config.maxArtifactBytes > 0 && contentLength !== undefined && contentLength > config.maxArtifactBytes) {
+		return errorResponse(413, "artifact_too_large", "Artifact upload exceeds configured size limit");
 	}
 
 	const contentType = request.headers.get("Content-Type");
@@ -53,7 +59,7 @@ async function putArtifact(request: Request, env: Env, ctx: ExecutionContext, te
 	}
 
 	const object = await putR2Artifact(env, key, request.body, customMetadata);
-	ctx.waitUntil(indexArtifact(env, { artifactId, authContext, customMetadata, key, object, tenant }));
+	ctx.waitUntil(indexArtifact(env, { artifactId, authContext, customMetadata, key, object, tenant }).catch(() => undefined));
 	recordMetric(env, ctx, { artifactId, event: MetricEvent.Put, method: request.method, status: 200, tenant: tenant.key, tokenId: authContext.tokenId });
 	return jsonResponse({ urls: [] });
 }

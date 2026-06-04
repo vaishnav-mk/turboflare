@@ -1,6 +1,5 @@
 import type { Env } from "../app/env";
 import { parseJsonArray } from "../shared/json";
-import { ALL_TEAMS } from "./constants";
 import { AuthScope, type AuthContext } from "./types";
 
 interface TokenRow {

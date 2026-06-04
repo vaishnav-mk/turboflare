@@ -92,6 +92,26 @@ describe("cache worker", () => {
 		});
 	});
 
+	it("returns unavailable when Access certs cannot be fetched", async ({ expect }) => {
+		const access = await accessFixture();
+		const response = await handleRequest(
+			new Request(`${BASE_URL}/internal/health`, { headers: { "Cf-Access-Jwt-Assertion": access.token } }),
+			{
+				ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS,
+				INTERNAL_ACCESS_AUD: access.audience,
+				INTERNAL_ACCESS_JWKS_URL: "not-a-valid-url",
+				INTERNAL_ACCESS_TEAM_DOMAIN: access.issuer,
+				TURBO_TOKEN: TOKEN,
+			},
+			createExecutionContext()
+		);
+
+		expect(response.status).toBe(503);
+		expect(await response.json()).toEqual({
+			error: { code: "unavailable", message: "Cloudflare Access certs unavailable" },
+		});
+	});
+
 	it("reports and purges internal team artifacts", async ({ expect }) => {
 		const env = { ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, INTERNAL_ACCESS_BYPASS: "true", TURBO_TOKEN: TOKEN } satisfies Env;
 		await env.ARTIFACTS.put(`v1/team/${TEAM_ID}/artifact/one`, new Uint8Array([1, 2]));
@@ -130,6 +150,7 @@ describe("cache worker", () => {
 			token: { expiresAt, id: "ci-token", revokedAt: null, scopes: ["read", "write"], teams: [TEAM_ID], token: "raw-token" },
 		});
 		expect(tokenDb.rows.get("ci-token")?.token_hash).toBe(await hashToken("raw-token"));
+		expect(tokenDb.audit.map((row) => [row.action, row.token_id])).toEqual([["create", "ci-token"]]);
 
 		const list = await handleRequest(new Request(`${BASE_URL}/internal/tokens`), env, createExecutionContext());
 		expect(list.status).toBe(200);
@@ -141,6 +162,10 @@ describe("cache worker", () => {
 		expect(revoke.status).toBe(200);
 		expect(await revoke.json()).toEqual({ revoked: { id: "ci-token", revokedAt: expect.any(String) } });
 		expect(tokenDb.rows.get("ci-token")?.revoked_at).toEqual(expect.any(String));
+		expect(tokenDb.audit.map((row) => [row.action, row.token_id])).toEqual([
+			["create", "ci-token"],
+			["revoke", "ci-token"],
+		]);
 	});
 
 	it("purges expired artifacts through the internal route", async ({ expect }) => {
@@ -289,6 +314,20 @@ describe("cache worker", () => {
 		expect(response.headers.get("access-control-allow-headers")).toContain("x-artifact-duration");
 	});
 
+	it("allows Turbo event preflight headers", async ({ expect }) => {
+		const response = await SELF.fetch(`${BASE_URL}/v8/artifacts/events`, {
+			method: "OPTIONS",
+			headers: {
+				"Access-Control-Request-Headers": "Authorization, Content-Type",
+				"Access-Control-Request-Method": "POST",
+			},
+		});
+
+		expect(response.status).toBe(204);
+		expect(response.headers.get("access-control-allow-methods")).toContain("POST");
+		expect(response.headers.get("access-control-allow-headers")).toContain("Authorization");
+	});
+
 	it("rejects rate-limited artifact requests", async ({ expect }) => {
 		let key = "";
 		const rateLimiter = {
@@ -308,6 +347,23 @@ describe("cache worker", () => {
 		expect(key).toBe(`team:${TEAM_ID}:token:static-0`);
 		expect(await response.json()).toEqual({
 			error: { code: "rate_limited", message: "Rate limit exceeded" },
+		});
+	});
+
+	it("rejects artifacts above the configured upload quota", async ({ expect }) => {
+		const response = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${randomArtifactId()}?teamId=${TEAM_ID}`, {
+				body: new Uint8Array([1, 2]),
+				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Length": "2", "Content-Type": "application/octet-stream" },
+				method: "PUT",
+			}),
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, MAX_ARTIFACT_BYTES: "1", TURBO_TOKEN: TOKEN },
+			createExecutionContext()
+		);
+
+		expect(response.status).toBe(413);
+		expect(await response.json()).toEqual({
+			error: { code: "artifact_too_large", message: "Artifact upload exceeds configured size limit" },
 		});
 	});
 
@@ -367,6 +423,55 @@ describe("cache worker", () => {
 		expect(head.headers.get("x-artifact-duration")).toBe("1234");
 	});
 
+	it("supports no-team single-tenant artifact requests", async ({ expect }) => {
+		const artifactId = randomArtifactId();
+		const body = new Uint8Array([5, 5, 5]);
+
+		const put = await fetchAuthed(`/v8/artifacts/${artifactId}`, {
+			body,
+			headers: { "Content-Type": "application/octet-stream" },
+			method: "PUT",
+		});
+		expect(put.status).toBe(200);
+
+		const stored = await (workerEnv as unknown as Env).ARTIFACTS.head(`v1/team/global/artifact/${artifactId}`);
+		expect(stored).not.toBeNull();
+
+		const get = await fetchAuthed(`/v8/artifacts/${artifactId}`);
+		expect(new Uint8Array(await get.arrayBuffer())).toEqual(body);
+	});
+
+	it("round-trips large artifacts without buffering in route code", async ({ expect }) => {
+		const artifactId = randomArtifactId();
+		const body = new Uint8Array(1024 * 1024);
+		body.fill(7);
+
+		const put = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+			body,
+			headers: { "Content-Length": body.byteLength.toString(), "Content-Type": "application/octet-stream" },
+			method: "PUT",
+		});
+		expect(put.status).toBe(200);
+
+		const get = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`);
+		expect(get.headers.get("content-length")).toBe(body.byteLength.toString());
+		expect((await get.arrayBuffer()).byteLength).toBe(body.byteLength);
+	});
+
+	it("uses R2 head without reading object bodies", async ({ expect }) => {
+		const artifactId = randomArtifactId();
+		const bucket = new HeadOnlyBucket(`v1/team/${TEAM_ID}/artifact/${artifactId}`);
+		const response = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` }, method: "HEAD" }),
+			{ ARTIFACTS: bucket as unknown as R2Bucket, TURBO_TOKEN: TOKEN },
+			createExecutionContext()
+		);
+
+		expect(response.status).toBe(200);
+		expect(bucket.headCalls).toBe(1);
+		expect(bucket.getCalls).toBe(0);
+	});
+
 	it("indexes artifact metadata when an index database is bound", async ({ expect }) => {
 		const artifactId = randomArtifactId();
 		const index = new ArtifactIndexDb();
@@ -391,6 +496,20 @@ describe("cache worker", () => {
 			team: TEAM_ID,
 			token_id: "static-0",
 		});
+	});
+
+	it("does not fail uploads when artifact indexing fails", async ({ expect }) => {
+		const response = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${randomArtifactId()}?teamId=${TEAM_ID}`, {
+				body: new Uint8Array([1]),
+				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/octet-stream" },
+				method: "PUT",
+			}),
+			{ ARTIFACT_INDEX: new ThrowingD1() as unknown as D1Database, ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, TURBO_TOKEN: TOKEN },
+			createExecutionContext()
+		);
+
+		expect(response.status).toBe(200);
 	});
 
 	it("accepts incremental artifact ids", async ({ expect }) => {
@@ -846,6 +965,19 @@ describe("cache worker", () => {
 		expect(await response.json()).toEqual({ accepted: true });
 	});
 
+	it("rejects malformed Turbo analytics events", async ({ expect }) => {
+		const response = await fetchAuthed(`/v8/artifacts/events?teamId=${TEAM_ID}`, {
+			body: JSON.stringify({ event: "HIT" }),
+			headers: { "Content-Type": "application/json" },
+			method: "POST",
+		});
+
+		expect(response.status).toBe(400);
+		expect(await response.json()).toEqual({
+			error: { code: "bad_request", message: "Events request body must be an array of Turbo cache events" },
+		});
+	});
+
 	it("accepts event variants with and without session ids", async ({ expect }) => {
 		const response = await fetchAuthed(`/v8/artifacts/events?teamId=${TEAM_ID}`, {
 			method: "POST",
@@ -890,7 +1022,21 @@ describe("cache worker", () => {
 		}
 
 		expect(points.map((point) => point.blobs?.[0])).toEqual(["status", "preflight", "get_miss", "put", "get_hit", "head_hit", "events"]);
+		expect(points.find((point) => point.blobs?.[0] === "put")?.blobs?.[3]).toBe(artifactId.slice(0, 16));
 		expect(points.every((point) => point.indexes?.[0] !== undefined)).toBe(true);
+	});
+
+	it("ignores analytics write failures", async ({ expect }) => {
+		const analytics = { writeDataPoint: () => { throw new Error("analytics down"); } } as unknown as AnalyticsEngineDataset;
+		const ctx = createExecutionContext();
+		const response = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/status`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			{ ANALYTICS: analytics, ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, TURBO_TOKEN: TOKEN },
+			ctx
+		);
+
+		await waitOnExecutionContext(ctx);
+		expect(response.status).toBe(200);
 	});
 });
 
@@ -923,6 +1069,13 @@ interface TokenAdminRow {
 	scopes: string;
 	teams: string;
 	token_hash: string;
+}
+
+interface TokenAuditRow {
+	action: string;
+	created_at: string;
+	id: string;
+	token_id: string;
 }
 
 interface ArtifactIndexRow {
@@ -974,6 +1127,18 @@ class ArtifactIndexDb {
 	}
 }
 
+class ThrowingD1 {
+	prepare(): D1PreparedStatement {
+		return {
+			bind: () => ({
+				run: async () => {
+					throw new Error("d1 down");
+				},
+			}),
+		} as unknown as D1PreparedStatement;
+	}
+}
+
 interface RouteCleanupObject {
 	key: string;
 	uploaded: Date;
@@ -1008,7 +1173,41 @@ class RouteCleanupBucket {
 	}
 }
 
+class HeadOnlyBucket {
+	getCalls = 0;
+	headCalls = 0;
+
+	constructor(private readonly key: string) {}
+
+	async get(): Promise<R2ObjectBody | null> {
+		this.getCalls += 1;
+		throw new Error("HEAD must not call get");
+	}
+
+	async head(key: string): Promise<R2Object | null> {
+		this.headCalls += 1;
+		if (key !== this.key) {
+			return null;
+		}
+
+		return {
+			checksums: {} as R2Checksums,
+			customMetadata: { duration: "4" },
+			etag: key,
+			httpEtag: `"${key}"`,
+			httpMetadata: { contentType: "application/octet-stream" },
+			key,
+			size: 4,
+			storageClass: "Standard",
+			uploaded: new Date(0),
+			version: key,
+			writeHttpMetadata() {},
+		} as unknown as R2Object;
+	}
+}
+
 class TokenAdminDb {
+	readonly audit: TokenAuditRow[] = [];
 	readonly rows = new Map<string, TokenAdminRow>();
 
 	prepare(query: string): D1PreparedStatement {
@@ -1017,10 +1216,15 @@ class TokenAdminDb {
 			bind: (...values: unknown[]) => ({
 				all: async () => ({ results: [...this.rows.values()].sort((left, right) => left.id.localeCompare(right.id)) }),
 				first: async () => null,
-				run: async () => {
+					run: async () => {
 					if (query.startsWith("insert")) {
-						const [id, tokenHash, teams, scopes, expiresAt] = values as [string, string, string, string, string | null];
-						this.rows.set(id, { expires_at: expiresAt, id, revoked_at: null, scopes, teams, token_hash: tokenHash });
+						if (query.includes("token_audit")) {
+							const [id, tokenId, action, createdAt] = values as [string, string, string, string];
+							this.audit.push({ action, created_at: createdAt, id, token_id: tokenId });
+						} else {
+							const [id, tokenHash, teams, scopes, expiresAt] = values as [string, string, string, string, string | null];
+							this.rows.set(id, { expires_at: expiresAt, id, revoked_at: null, scopes, teams, token_hash: tokenHash });
+						}
 					}
 
 					if (query.startsWith("update")) {
