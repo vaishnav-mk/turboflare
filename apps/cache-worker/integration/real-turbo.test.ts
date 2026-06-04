@@ -28,6 +28,11 @@ interface TurboFixture {
 	directory: string;
 }
 
+interface TurboRunOptions {
+	extraEnv?: NodeJS.ProcessEnv;
+	teamEnv?: NodeJS.ProcessEnv;
+}
+
 const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const REPO_ROOT = join(PACKAGE_ROOT, "..", "..");
 const COMPLEX_FIXTURE_ROOT = join(REPO_ROOT, "fixtures", "complex-turbo-monorepo");
@@ -70,6 +75,48 @@ describe("real turbo fixture", () => {
 		await expectNonEmptyDirectory(join(fixture.directory, "packages", "ui", "dist"));
 		await expectNonEmptyDirectory(join(fixture.directory, "packages", "math", "dist"));
 	});
+
+	it("supports team id, preflight, signature, and remote-read modes", async ({ expect }) => {
+		const artifacts = new MemoryR2Bucket();
+		const server = await startWorkerServer({ ARTIFACTS: artifacts as unknown as R2Bucket, TURBO_TOKEN });
+		cleanupTasks.push(server.close);
+
+		const fixture = await createTurboFixture();
+		cleanupTasks.push(() => rm(fixture.directory, { force: true, recursive: true }));
+
+		const first = await runTurbo(fixture, server.url, {
+			extraEnv: { TURBO_PREFLIGHT: "true", TURBO_REMOTE_CACHE_SIGNATURE_KEY: "x".repeat(32) },
+			teamEnv: { TURBO_TEAMID: "team_fixture_id" },
+		});
+		expect(first.stdout).toMatch(/cache miss/i);
+		const firstHashes = cacheHashes(first.stdout);
+		expect(firstHashes.length).toBeGreaterThanOrEqual(6);
+
+		await removeGeneratedDirectories(fixture.directory);
+		expect((await runProcess("git", ["status", "--porcelain"], fixture.directory)).stdout).toBe("");
+
+		const second = await runTurbo(fixture, server.url, {
+			extraEnv: { TURBO_CACHE: "local:,remote:r", TURBO_PREFLIGHT: "true", TURBO_REMOTE_CACHE_SIGNATURE_KEY: "x".repeat(32) },
+			teamEnv: { TURBO_TEAMID: "team_fixture_id" },
+		});
+		expect(cacheHashes(second.stdout)).toEqual(firstHashes);
+		expect(second.stdout).toMatch(/cache hit/i);
+		await expectNonEmptyDirectory(join(fixture.directory, "apps", "web", ".next"));
+	});
+
+	it("does not enable remote caching without a team", async ({ expect }) => {
+		const artifacts = new MemoryR2Bucket();
+		const server = await startWorkerServer({ ARTIFACTS: artifacts as unknown as R2Bucket, TURBO_TOKEN });
+		cleanupTasks.push(server.close);
+
+		const fixture = await createTurboFixture();
+		cleanupTasks.push(() => rm(fixture.directory, { force: true, recursive: true }));
+
+		const result = await runTurbo(fixture, server.url, { teamEnv: {} });
+		expect(result.stdout).toMatch(/Remote caching disabled/i);
+		expect(result.stdout).toMatch(/cache bypass/i);
+		expect(artifacts.objects.size).toBe(0);
+	});
 });
 
 async function createTurboFixture(): Promise<TurboFixture> {
@@ -91,15 +138,18 @@ function cacheHashes(stdout: string): string[] {
 	return matches;
 }
 
-function runTurbo(fixture: TurboFixture, turboApi: string): Promise<{ stderr: string; stdout: string }> {
+function runTurbo(fixture: TurboFixture, turboApi: string, options: TurboRunOptions = {}): Promise<{ stderr: string; stdout: string }> {
+	const teamEnv = options.teamEnv ?? { TURBO_TEAM };
+
 	return runProcess(TURBO_BIN, ["run", "build", "--output-logs=full"], fixture.directory, {
 		FORCE_COLOR: "0",
 		NO_COLOR: "1",
 		TURBO_API: turboApi,
 		TURBO_CACHE: "remote:rw",
-		TURBO_TEAM,
+		...teamEnv,
 		TURBO_TELEMETRY_DISABLED: "1",
 		TURBO_TOKEN,
+		...options.extraEnv,
 	});
 }
 
