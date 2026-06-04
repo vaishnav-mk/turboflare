@@ -38,7 +38,7 @@ export async function hashToken(token: string): Promise<string> {
 }
 
 function parseScopes(value: string): readonly AuthScope[] {
-	return parseJsonArray(value).flatMap((scope) => (scope === AuthScope.Read || scope === AuthScope.Write ? [scope] : []));
+	return parseJsonArray(value).flatMap((scope) => (scope === AuthScope.Admin || scope === AuthScope.Read || scope === AuthScope.Write ? [scope] : []));
 }
 
 function parseTeams(value: string): readonly string[] {

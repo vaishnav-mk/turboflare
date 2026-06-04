@@ -81,7 +81,7 @@ function parseTeams(value: unknown): readonly string[] {
 }
 
 function isAuthScope(value: unknown): value is AuthScope {
-	return value === AuthScope.Read || value === AuthScope.Write;
+	return value === AuthScope.Admin || value === AuthScope.Read || value === AuthScope.Write;
 }
 
 function unique<T>(values: readonly T[]): readonly T[] {

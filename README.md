@@ -103,6 +103,12 @@ create table tokens (
 
 `token_hash` is the lowercase hex SHA-256 of the raw token. `teams` and `scopes` are JSON arrays, for example `teams = ["team_turboflare"]` and `scopes = ["read", "write"]`.
 
+Access-protected token admin routes are available when `TOKEN_DB` is bound:
+
+- `GET /internal/tokens` lists token metadata without hashes.
+- `POST /internal/tokens` creates a token from `{ "teams": ["team_turboflare"], "scopes": ["read", "write"] }` and returns the raw token once.
+- `POST /internal/tokens/:id/revoke` marks a token revoked without deleting its audit row.
+
 Optional Worker variables and bindings:
 
 - `CACHE_API_READS=true` enables authenticated Cache API reads with synthetic artifact keys.

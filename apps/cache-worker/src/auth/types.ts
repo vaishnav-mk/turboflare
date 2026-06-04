@@ -1,4 +1,5 @@
 export enum AuthScope {
+	Admin = "admin",
 	Read = "read",
 	Write = "write",
 }

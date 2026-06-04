@@ -37,7 +37,7 @@ describe("D1 token auth", () => {
 		const badScopes = "bad-scopes";
 		const badTeams = "bad-teams";
 		const env = tokenEnv({
-			[await hashToken(badScopes)]: { expires_at: null, id: "bad-scopes", revoked_at: null, scopes: JSON.stringify(["admin"]), teams: JSON.stringify(["team_a"]) },
+			[await hashToken(badScopes)]: { expires_at: null, id: "bad-scopes", revoked_at: null, scopes: JSON.stringify(["owner"]), teams: JSON.stringify(["team_a"]) },
 			[await hashToken(badTeams)]: { expires_at: null, id: "bad-teams", revoked_at: null, scopes: JSON.stringify([AuthScope.Read]), teams: "not-json" },
 		});
 

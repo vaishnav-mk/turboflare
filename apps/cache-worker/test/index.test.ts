@@ -5,6 +5,7 @@ import { afterEach, describe, it } from "vitest";
 import { CacheStatus } from "@turboflare/protocol";
 
 import { handleRequest, type Env } from "../src";
+import { hashToken } from "../src/auth/d1";
 import { artifactCache, cacheRequest } from "../src/storage/cache-api";
 
 const BASE_URL = "https://cache.turboflare.test";
@@ -105,6 +106,52 @@ describe("cache worker", () => {
 
 		expect(await env.ARTIFACTS.head(`v1/team/${TEAM_ID}/artifact/one`)).toBeNull();
 		expect(await env.ARTIFACTS.head(`v1/team/${OTHER_TEAM_ID}/artifact/three`)).not.toBeNull();
+	});
+
+	it("creates lists and revokes internal tokens", async ({ expect }) => {
+		const tokenDb = new TokenAdminDb();
+		const env = { ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, INTERNAL_ACCESS_BYPASS: "true", TOKEN_DB: tokenDb as unknown as D1Database } satisfies Env;
+		const expiresAt = "2027-01-01T00:00:00.000Z";
+
+		const create = await handleRequest(
+			new Request(`${BASE_URL}/internal/tokens`, {
+				body: JSON.stringify({ expiresAt, id: "ci-token", scopes: ["read", "write"], teams: [TEAM_ID], token: "raw-token" }),
+				headers: { "Content-Type": "application/json" },
+				method: "POST",
+			}),
+			env,
+			createExecutionContext()
+		);
+
+		expect(create.status).toBe(201);
+		expect(await create.json()).toEqual({
+			token: { expiresAt, id: "ci-token", revokedAt: null, scopes: ["read", "write"], teams: [TEAM_ID], token: "raw-token" },
+		});
+		expect(tokenDb.rows.get("ci-token")?.token_hash).toBe(await hashToken("raw-token"));
+
+		const list = await handleRequest(new Request(`${BASE_URL}/internal/tokens`), env, createExecutionContext());
+		expect(list.status).toBe(200);
+		expect(await list.json()).toEqual({
+			tokens: [{ expiresAt, id: "ci-token", revokedAt: null, scopes: ["read", "write"], teams: [TEAM_ID] }],
+		});
+
+		const revoke = await handleRequest(new Request(`${BASE_URL}/internal/tokens/ci-token/revoke`, { method: "POST" }), env, createExecutionContext());
+		expect(revoke.status).toBe(200);
+		expect(await revoke.json()).toEqual({ revoked: { id: "ci-token", revokedAt: expect.any(String) } });
+		expect(tokenDb.rows.get("ci-token")?.revoked_at).toEqual(expect.any(String));
+	});
+
+	it("requires token database for internal token routes", async ({ expect }) => {
+		const response = await handleRequest(
+			new Request(`${BASE_URL}/internal/tokens`),
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, INTERNAL_ACCESS_BYPASS: "true" },
+			createExecutionContext()
+		);
+
+		expect(response.status).toBe(503);
+		expect(await response.json()).toEqual({
+			error: { code: "unavailable", message: "Token database is not configured" },
+		});
 	});
 
 	it("rejects unauthenticated Turbo requests", async ({ expect }) => {
@@ -750,6 +797,45 @@ function randomArtifactId(): string {
 }
 
 type TestJsonWebKey = JsonWebKey & { alg?: string; kid?: string; use?: string };
+
+interface TokenAdminRow {
+	expires_at: string | null;
+	id: string;
+	revoked_at: string | null;
+	scopes: string;
+	teams: string;
+	token_hash: string;
+}
+
+class TokenAdminDb {
+	readonly rows = new Map<string, TokenAdminRow>();
+
+	prepare(query: string): D1PreparedStatement {
+		return {
+			all: async () => ({ results: [...this.rows.values()].sort((left, right) => left.id.localeCompare(right.id)) }),
+			bind: (...values: unknown[]) => ({
+				all: async () => ({ results: [...this.rows.values()].sort((left, right) => left.id.localeCompare(right.id)) }),
+				first: async () => null,
+				run: async () => {
+					if (query.startsWith("insert")) {
+						const [id, tokenHash, teams, scopes, expiresAt] = values as [string, string, string, string, string | null];
+						this.rows.set(id, { expires_at: expiresAt, id, revoked_at: null, scopes, teams, token_hash: tokenHash });
+					}
+
+					if (query.startsWith("update")) {
+						const [revokedAt, id] = values as [string, string];
+						const row = this.rows.get(id);
+						if (row !== undefined && row.revoked_at === null) {
+							row.revoked_at = revokedAt;
+						}
+					}
+
+					return { success: true };
+				},
+			}),
+		} as unknown as D1PreparedStatement;
+	}
+}
 
 async function accessFixture(input: { audience?: string; issuer?: string } = {}): Promise<{ audience: string; issuer: string; publicJwk: TestJsonWebKey; token: string }> {
 	const audience = input.audience ?? "expected-audience";

@@ -4,6 +4,7 @@ import type { Env } from "../../app/env";
 import { requireAccess } from "../../auth/access";
 import { handleInternalHealth } from "./health";
 import { handleInternalTeam } from "./team";
+import { handleInternalTokens } from "./tokens";
 
 export async function handleInternal(request: Request, env: Env): Promise<Response | null> {
 	const url = new URL(request.url);
@@ -24,6 +25,11 @@ export async function handleInternal(request: Request, env: Env): Promise<Respon
 	const team = await handleInternalTeam(request, env);
 	if (team !== null) {
 		return team;
+	}
+
+	const tokens = await handleInternalTokens(request, env);
+	if (tokens !== null) {
+		return tokens;
 	}
 
 	if (url.pathname === "/internal/health") {
