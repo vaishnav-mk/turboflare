@@ -8,8 +8,8 @@ import { MAX_BATCH_HASHES, OCTET_STREAM, R2_BATCH_HEAD_CONCURRENCY } from "./con
 import { artifactKey } from "./keys";
 import { lookupHit } from "./metadata";
 
-export async function putR2Artifact(env: Env, key: string, body: ReadableStream, customMetadata: Record<string, string>): Promise<void> {
-	await env.ARTIFACTS.put(key, body, {
+export async function putR2Artifact(env: Env, key: string, body: ReadableStream, customMetadata: Record<string, string>): Promise<R2Object> {
+	return env.ARTIFACTS.put(key, body, {
 		httpMetadata: {
 			contentType: OCTET_STREAM,
 		},

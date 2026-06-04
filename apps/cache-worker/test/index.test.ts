@@ -312,6 +312,32 @@ describe("cache worker", () => {
 		expect(head.headers.get("x-artifact-duration")).toBe("1234");
 	});
 
+	it("indexes artifact metadata when an index database is bound", async ({ expect }) => {
+		const artifactId = randomArtifactId();
+		const index = new ArtifactIndexDb();
+		const ctx = createExecutionContext();
+		const response = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+				body: new Uint8Array([1, 2, 3]),
+				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/octet-stream", "x-artifact-duration": "12", "x-artifact-tag": "build#app" },
+				method: "PUT",
+			}),
+			{ ARTIFACT_INDEX: index as unknown as D1Database, ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, TURBO_TOKEN: TOKEN },
+			ctx
+		);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(200);
+		expect(index.rows.get(`v1/team/${TEAM_ID}/artifact/${artifactId}`)).toMatchObject({
+			artifact_id: artifactId,
+			duration_ms: 12,
+			size: 3,
+			tag: "build#app",
+			team: TEAM_ID,
+			token_id: "static-0",
+		});
+	});
+
 	it("accepts incremental artifact ids", async ({ expect }) => {
 		const artifactId = `incremental-${"a".repeat(64)}`;
 		const body = new Uint8Array([9, 9, 9]);
@@ -842,6 +868,55 @@ interface TokenAdminRow {
 	scopes: string;
 	teams: string;
 	token_hash: string;
+}
+
+interface ArtifactIndexRow {
+	artifact_id: string;
+	created_at: string;
+	dirty_hash: string | null;
+	duration_ms: number;
+	object_key: string;
+	sha: string | null;
+	size: number;
+	tag: string | null;
+	team: string;
+	token_id: string;
+	updated_at: string;
+}
+
+class ArtifactIndexDb {
+	readonly rows = new Map<string, ArtifactIndexRow>();
+
+	prepare(query: string): D1PreparedStatement {
+		return {
+			bind: (...values: unknown[]) => ({
+				run: async () => {
+					if (query.startsWith("insert")) {
+						const [objectKey, team, artifactId, size, durationMs, tag, sha, dirtyHash, tokenId, createdAt, updatedAt] = values as [
+							string,
+							string,
+							string,
+							number,
+							number,
+							string | null,
+							string | null,
+							string | null,
+							string,
+							string,
+							string,
+						];
+						this.rows.set(objectKey, { artifact_id: artifactId, created_at: createdAt, dirty_hash: dirtyHash, duration_ms: durationMs, object_key: objectKey, sha, size, tag, team, token_id: tokenId, updated_at: updatedAt });
+					}
+
+					if (query.startsWith("delete")) {
+						this.rows.delete(values[0] as string);
+					}
+
+					return { success: true };
+				},
+			}),
+		} as unknown as D1PreparedStatement;
+	}
 }
 
 interface RouteCleanupObject {

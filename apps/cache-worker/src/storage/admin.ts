@@ -1,5 +1,6 @@
 import type { Env } from "../app/env";
 import { ARTIFACT_NAMESPACE_VERSION } from "./constants";
+import { deleteIndexedArtifacts } from "./index";
 
 export interface TeamStats {
 	bytes: number;
@@ -42,6 +43,7 @@ export async function purgeTeam(env: Env, team: string, maxDelete = PAGE_LIMIT):
 
 		if (selected.length > 0) {
 			await env.ARTIFACTS.delete(selected);
+			await deleteIndexedArtifacts(env, selected);
 			deleted += selected.length;
 		}
 

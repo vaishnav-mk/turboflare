@@ -38,6 +38,7 @@ Current implementation details:
 - Optional Cache API reads are available after auth with synthetic artifact keys.
 - Optional Analytics Engine metrics are emitted without blocking cache requests.
 - Optional Rate Limiting binding enforcement keys limits by team and token.
+- Optional D1 artifact indexing records upload metadata for larger installations.
 - Scheduled R2 cleanup can remove expired artifacts under the versioned key prefix.
 - `/internal/*` routes are separated from Turbo bearer auth and protected by Cloudflare Access JWT verification.
 
@@ -103,6 +104,28 @@ create table tokens (
 ```
 
 `token_hash` is the lowercase hex SHA-256 of the raw token. `teams` and `scopes` are JSON arrays, for example `teams = ["team_turboflare"]` and `scopes = ["read", "write"]`.
+
+For optional artifact indexing, bind `ARTIFACT_INDEX` and create this table:
+
+```sql
+create table artifact_index (
+  object_key text primary key,
+  team text not null,
+  artifact_id text not null,
+  size integer not null,
+  duration_ms integer not null,
+  tag text,
+  sha text,
+  dirty_hash text,
+  token_id text not null,
+  created_at text not null,
+  updated_at text not null
+);
+
+create index artifact_index_team on artifact_index(team);
+```
+
+Index writes run after R2 upload via `ctx.waitUntil()` and are not required for cache correctness.
 
 Access-protected token admin routes are available when `TOKEN_DB` is bound:
 

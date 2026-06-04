@@ -3,6 +3,7 @@ import { CacheStatus, isCacheStatus } from "@turboflare/protocol";
 export interface Env {
 	INTERNAL_ACCESS_AUD?: string;
 	ANALYTICS?: AnalyticsEngineDataset;
+	ARTIFACT_INDEX?: D1Database;
 	ARTIFACTS: R2Bucket;
 	CACHE_API_MAX_BYTES?: string;
 	CACHE_API_READS?: string;

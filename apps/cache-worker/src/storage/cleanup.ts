@@ -1,5 +1,6 @@
 import { appConfig, type Env } from "../app/env";
 import { ARTIFACT_NAMESPACE_VERSION } from "./constants";
+import { deleteIndexedArtifacts } from "./index";
 
 export interface CleanupResult {
 	deleted: number;
@@ -29,6 +30,7 @@ export async function cleanupExpiredArtifacts(env: Env, now = Date.now()): Promi
 
 		if (selected.length > 0) {
 			await env.ARTIFACTS.delete(selected);
+			await deleteIndexedArtifacts(env, selected);
 			deleted += selected.length;
 		}
 

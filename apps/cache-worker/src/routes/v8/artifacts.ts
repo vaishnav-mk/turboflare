@@ -6,6 +6,7 @@ import type { AuthContext } from "../../auth/types";
 import { recordMetric } from "../../observability/metrics";
 import { MetricEvent } from "../../observability/types";
 import { artifactCache, cacheableResponse, cacheRequest } from "../../storage/cache-api";
+import { indexArtifact } from "../../storage/index";
 import { artifactKey } from "../../storage/keys";
 import { artifactCustomMetadata, artifactResponseHeaders } from "../../storage/metadata";
 import { getR2Artifact, headR2Artifact, putR2Artifact } from "../../storage/r2";
@@ -51,7 +52,8 @@ async function putArtifact(request: Request, env: Env, ctx: ExecutionContext, te
 		return customMetadata;
 	}
 
-	await putR2Artifact(env, key, request.body, customMetadata);
+	const object = await putR2Artifact(env, key, request.body, customMetadata);
+	ctx.waitUntil(indexArtifact(env, { artifactId, authContext, customMetadata, key, object, tenant }));
 	recordMetric(env, ctx, { artifactId, event: MetricEvent.Put, method: request.method, status: 200, tenant: tenant.key, tokenId: authContext.tokenId });
 	return jsonResponse({ urls: [] });
 }
