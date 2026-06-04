@@ -6,9 +6,10 @@
 	"packageManager": "pnpm@11.5.0",
 	"scripts": {
 		"build": "turbo run build",
-		"check": "pnpm typecheck && pnpm test",
+		"check": "pnpm typecheck && pnpm test && pnpm test:integration",
 		"dev": "pnpm --filter @turboflare/cache-worker dev",
 		"test": "turbo run test",
+		"test:integration": "turbo run test:integration",
 		"typecheck": "turbo run typecheck"
 	},
 	"devDependencies": {
