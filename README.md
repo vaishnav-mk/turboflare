@@ -56,6 +56,17 @@ pnpm --filter @turboflare/cache-worker dev
 pnpm check
 ```
 
+Useful test commands:
+
+```sh
+pnpm test
+pnpm test:integration
+pnpm --filter @turboflare/cache-worker exec vitest run test/index.test.ts
+pnpm --filter @turboflare/cache-worker test:integration
+```
+
+`pnpm test:integration` runs a real `turbo run build` fixture against a local HTTP server backed by the Worker handler and in-memory R2. It verifies that the first run uploads to remote cache and the second run restores a remote cache hit.
+
 Set `TURBO_TOKEN` on the Worker to one token or a comma-separated token allowlist. Turborepo sends it as `Authorization: Bearer <token>`.
 
 For team-scoped static tokens, set `TURBO_TOKEN_SCOPES` to a JSON array:
