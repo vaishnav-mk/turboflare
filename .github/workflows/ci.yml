@@ -7,21 +7,18 @@ on:
       - main
   workflow_dispatch:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   with-turborepo:
     name: with turborepo
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.5.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
@@ -30,7 +27,7 @@ jobs:
 
       - run: node scripts/ci/profile.mjs with-turborepo
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: ci-profile-with-turborepo
@@ -40,13 +37,13 @@ jobs:
     name: without turborepo
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.5.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
@@ -55,7 +52,7 @@ jobs:
 
       - run: node scripts/ci/profile.mjs without-turborepo
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: ci-profile-without-turborepo
@@ -69,25 +66,25 @@ jobs:
       - without-turborepo
     if: always()
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: ci-profile-with-turborepo
           path: ci-results/with-turborepo
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: ci-profile-without-turborepo
           path: ci-results/without-turborepo
 
       - run: node scripts/ci/compare-profiles.mjs ci-results/with-turborepo/profile.json ci-results/without-turborepo/profile.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: ci-profile-comparison
