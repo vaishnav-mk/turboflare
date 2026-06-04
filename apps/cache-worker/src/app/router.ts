@@ -2,7 +2,7 @@ import { ARTIFACT_EVENTS_PATH, ARTIFACT_STATUS_PATH, ARTIFACTS_PATH, HttpMethod,
 import { errorResponse } from "@turboflare/shared";
 
 import type { Env } from "./env";
-import { authorizeBearer } from "../auth/bearer";
+import { authenticateBearer, canAccessTenant, hasScope } from "../auth/bearer";
 import { AuthScope } from "../auth/types";
 import { handleHealth } from "../routes/internal/health";
 import { handleArtifact } from "../routes/v8/artifacts";
@@ -40,13 +40,16 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
 	}
 
 	const requiredScope = request.method === HttpMethod.Put ? AuthScope.Write : AuthScope.Read;
-	const authContext = authorizeBearer(request, env, requiredScope);
+	const authContext = authenticateBearer(request, env);
 	if (authContext === null) {
 		return withProtocolHeaders(
 			errorResponse(401, "unauthorized", "Missing or invalid bearer token", {
 				"WWW-Authenticate": "Bearer",
 			})
 		);
+	}
+	if (!hasScope(authContext, requiredScope)) {
+		return withProtocolHeaders(errorResponse(403, "forbidden", "Token does not have the required scope"));
 	}
 
 	if (url.pathname === ARTIFACT_STATUS_PATH) {
@@ -58,6 +61,10 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
 	}
 
 	const tenant = resolveTenant(url);
+	if (!canAccessTenant(authContext, tenant)) {
+		return withProtocolHeaders(errorResponse(403, "forbidden", "Token cannot access this team"));
+	}
+
 	if (url.pathname === ARTIFACTS_PATH || url.pathname === `${ARTIFACTS_PATH}/`) {
 		return withProtocolHeaders(await handleArtifactLookup(request, env, tenant));
 	}

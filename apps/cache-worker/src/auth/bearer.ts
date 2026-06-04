@@ -1,48 +1,48 @@
 import { readBearerToken, timingSafeEqual } from "@turboflare/shared";
 
 import type { Env } from "../app/env";
-import { AuthScope, type AuthContext } from "./types";
-
-const MAX_BEARER_TOKEN_LENGTH = 512;
+import type { TenantContext } from "../tenancy/types";
+import { ALL_TEAMS, MAX_BEARER_TOKEN_LENGTH } from "./constants";
+import { parseAllowedTokens, parseScopedTokens } from "./static";
+import { type AuthContext, AuthScope, type StaticTokenRule } from "./types";
 
 let cachedRawTokens: string | undefined;
-let cachedAllowedTokens: readonly string[] = [];
+let cachedRawScopedTokens: string | undefined;
+let cachedTokenRules: readonly StaticTokenRule[] = [];
 
-export function authorizeBearer(request: Request, env: Env, _scope: AuthScope): AuthContext | null {
+export function authenticateBearer(request: Request, env: Env): AuthContext | null {
 	const token = readBearerToken(request);
 	if (token === null || token.length > MAX_BEARER_TOKEN_LENGTH) {
 		return null;
 	}
 
-	const tokens = allowedTokens(env.TURBO_TOKEN);
-	const tokenIndex = tokens.findIndex((allowedToken) => timingSafeEqual(token, allowedToken));
-	if (tokenIndex === -1) {
+	const rule = tokenRules(env).find((tokenRule) => timingSafeEqual(token, tokenRule.token));
+	if (rule === undefined) {
 		return null;
 	}
 
 	return {
-		scopes: [AuthScope.Read, AuthScope.Write],
-		tokenId: `static-${tokenIndex}`,
+		allowedTeams: rule.teams,
+		scopes: rule.scopes,
+		tokenId: rule.id ?? "static",
 	};
 }
 
-function allowedTokens(rawTokens: string | undefined): readonly string[] {
-	if (rawTokens === cachedRawTokens) {
-		return cachedAllowedTokens;
-	}
-
-	cachedRawTokens = rawTokens;
-	cachedAllowedTokens = parseAllowedTokens(rawTokens);
-	return cachedAllowedTokens;
+export function hasScope(authContext: AuthContext, scope: AuthScope): boolean {
+	return authContext.scopes.includes(scope);
 }
 
-export function parseAllowedTokens(rawTokens: string | undefined): readonly string[] {
-	if (rawTokens === undefined) {
-		return [];
+export function canAccessTenant(authContext: AuthContext, tenant: TenantContext): boolean {
+	return authContext.allowedTeams.includes(ALL_TEAMS) || authContext.allowedTeams.includes(tenant.key);
+}
+
+function tokenRules(env: Env): readonly StaticTokenRule[] {
+	if (env.TURBO_TOKEN === cachedRawTokens && env.TURBO_TOKEN_SCOPES === cachedRawScopedTokens) {
+		return cachedTokenRules;
 	}
 
-	return rawTokens
-		.split(",")
-		.map((token) => token.trim())
-		.filter((token) => token.length > 0 && token.length <= MAX_BEARER_TOKEN_LENGTH);
+	cachedRawTokens = env.TURBO_TOKEN;
+	cachedRawScopedTokens = env.TURBO_TOKEN_SCOPES;
+	cachedTokenRules = [...parseAllowedTokens(env.TURBO_TOKEN), ...parseScopedTokens(env.TURBO_TOKEN_SCOPES)];
+	return cachedTokenRules;
 }

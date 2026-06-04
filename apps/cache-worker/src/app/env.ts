@@ -5,6 +5,7 @@ export interface Env {
 	CACHE_STATUS?: string;
 	READ_ONLY?: string;
 	TURBO_TOKEN?: string;
+	TURBO_TOKEN_SCOPES?: string;
 }
 
 export interface AppConfig {
