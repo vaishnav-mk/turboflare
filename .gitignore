@@ -13,6 +13,7 @@
 /.cache/
 
 # Build outputs
+/ci-results/
 /dist/
 **/dist/
 /build/
