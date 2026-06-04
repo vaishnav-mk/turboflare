@@ -33,6 +33,25 @@ describe("cache worker", () => {
 		expect(await response.text()).toBe("");
 	});
 
+	it("separates internal health from Turbo bearer auth", async ({ expect }) => {
+		const bearerOnly = await handleRequest(
+			new Request(`${BASE_URL}/internal/health`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, TURBO_TOKEN: TOKEN },
+			createExecutionContext()
+		);
+		expect(bearerOnly.status).toBe(401);
+		expect(await bearerOnly.json()).toEqual({
+			error: { code: "unauthorized", message: "Missing Cloudflare Access assertion" },
+		});
+
+		const bypassed = await handleRequest(
+			new Request(`${BASE_URL}/internal/health`),
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, INTERNAL_ACCESS_BYPASS: "true", TURBO_TOKEN: TOKEN },
+			createExecutionContext()
+		);
+		expect(bypassed.status).toBe(200);
+	});
+
 	it("rejects unauthenticated Turbo requests", async ({ expect }) => {
 		const response = await SELF.fetch(`${BASE_URL}/v8/artifacts/status`);
 

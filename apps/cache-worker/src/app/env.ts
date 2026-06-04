@@ -6,6 +6,7 @@ export interface Env {
 	CACHE_API_MAX_BYTES?: string;
 	CACHE_API_READS?: string;
 	CACHE_STATUS?: string;
+	INTERNAL_ACCESS_BYPASS?: string;
 	READ_ONLY?: string;
 	TURBO_TOKEN?: string;
 	TURBO_TOKEN_SCOPES?: string;
@@ -15,6 +16,7 @@ export interface AppConfig {
 	cacheApiMaxBytes: number;
 	cacheApiReads: boolean;
 	cacheStatus: CacheStatus;
+	internalAccessBypass: boolean;
 	readOnly: boolean;
 }
 
@@ -25,6 +27,7 @@ export function appConfig(env: Env): AppConfig {
 		cacheApiMaxBytes: numberValue(env.CACHE_API_MAX_BYTES, DEFAULT_CACHE_API_MAX_BYTES),
 		cacheApiReads: isTruthy(env.CACHE_API_READS),
 		cacheStatus: env.CACHE_STATUS !== undefined && isCacheStatus(env.CACHE_STATUS) ? env.CACHE_STATUS : CacheStatus.Enabled,
+		internalAccessBypass: isTruthy(env.INTERNAL_ACCESS_BYPASS),
 		readOnly: isTruthy(env.READ_ONLY),
 	};
 }

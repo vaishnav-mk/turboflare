@@ -7,6 +7,7 @@ import { AuthScope } from "../auth/types";
 import { recordMetric } from "../observability/metrics";
 import { MetricEvent } from "../observability/types";
 import { handleHealth } from "../routes/internal/health";
+import { handleInternal } from "../routes/internal/router";
 import { handleArtifact } from "../routes/v8/artifacts";
 import { handleArtifactLookup } from "../routes/v8/batch";
 import { handleEvents } from "../routes/v8/events";
@@ -31,6 +32,11 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
 	const health = handleHealth(request);
 	if (health !== null) {
 		return health;
+	}
+
+	const internal = handleInternal(request, env);
+	if (internal !== null) {
+		return internal;
 	}
 
 	if (!url.pathname.startsWith(`${TURBO_API_PREFIX}/`)) {
