@@ -2,7 +2,7 @@ import { type ArtifactLookupRequest, HttpMethod } from "@turboflare/protocol";
 import { errorResponse, methodNotAllowed } from "@turboflare/shared";
 
 import type { Env } from "../../app/env";
-import { lookupR2Artifacts } from "../../storage/r2";
+import { artifactStoreUnavailable, lookupArtifacts } from "../../storage/artifacts";
 import type { TenantContext } from "../../tenancy/types";
 
 export async function handleArtifactLookup(request: Request, env: Env, tenant: TenantContext): Promise<Response> {
@@ -15,7 +15,8 @@ export async function handleArtifactLookup(request: Request, env: Env, tenant: T
 		return payload;
 	}
 
-	return lookupR2Artifacts(env, tenant, payload.hashes);
+	const storeError = artifactStoreUnavailable(env);
+	return storeError ?? lookupArtifacts(env, tenant, payload.hashes);
 }
 
 async function readLookupRequest(request: Request): Promise<ArtifactLookupRequest | Response> {

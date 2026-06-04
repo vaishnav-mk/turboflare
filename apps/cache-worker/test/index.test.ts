@@ -423,6 +423,85 @@ describe("cache worker", () => {
 		expect(head.headers.get("x-artifact-duration")).toBe("1234");
 	});
 
+	it("supports the optional KV artifact store", async ({ expect }) => {
+		const artifactId = randomArtifactId();
+		const body = new Uint8Array([4, 2, 0]);
+		const kv = new MemoryKV();
+		const env = { ARTIFACT_STORE: "kv", ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, ARTIFACTS_KV: kv as unknown as KVNamespace, TURBO_TOKEN: TOKEN } satisfies Env;
+
+		const put = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+				body,
+				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Length": body.byteLength.toString(), "Content-Type": "application/octet-stream", "x-artifact-duration": "6", "x-artifact-tag": "kv" },
+				method: "PUT",
+			}),
+			env,
+			createExecutionContext()
+		);
+		expect(put.status).toBe(200);
+
+		const head = await handleRequest(new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` }, method: "HEAD" }), env, createExecutionContext());
+		expect(head.status).toBe(200);
+		expect(head.headers.get("content-length")).toBe(body.byteLength.toString());
+		expect(head.headers.get("x-artifact-duration")).toBe("6");
+
+		const get = await handleRequest(new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }), env, createExecutionContext());
+		expect(get.status).toBe(200);
+		expect(get.headers.get("x-artifact-tag")).toBe("kv");
+		expect(new Uint8Array(await get.arrayBuffer())).toEqual(body);
+
+		const lookup = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts?teamId=${TEAM_ID}`, { body: JSON.stringify({ hashes: [artifactId, "missing"] }), headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" }, method: "POST" }),
+			env,
+			createExecutionContext()
+		);
+		expect(await lookup.json()).toEqual({
+			[artifactId]: { size: body.byteLength, tag: "kv", taskDurationMs: 6 },
+			missing: null,
+		});
+	});
+
+	it("requires explicit KV binding for KV artifact store", async ({ expect }) => {
+		const response = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${randomArtifactId()}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			{ ARTIFACT_STORE: "kv", ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, TURBO_TOKEN: TOKEN },
+			createExecutionContext()
+		);
+
+		expect(response.status).toBe(503);
+		expect(await response.json()).toEqual({ error: { code: "unavailable", message: "KV artifact store is not configured" } });
+	});
+
+	it("caps KV artifact uploads", async ({ expect }) => {
+		const response = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${randomArtifactId()}?teamId=${TEAM_ID}`, {
+				body: new Uint8Array([1]),
+				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Length": `${25 * 1024 * 1024 + 1}`, "Content-Type": "application/octet-stream" },
+				method: "PUT",
+			}),
+			{ ARTIFACT_STORE: "kv", ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, ARTIFACTS_KV: new MemoryKV() as unknown as KVNamespace, TURBO_TOKEN: TOKEN },
+			createExecutionContext()
+		);
+
+		expect(response.status).toBe(413);
+		expect(await response.json()).toEqual({ error: { code: "artifact_too_large", message: "Artifact upload exceeds configured KV size limit" } });
+	});
+
+	it("reports and purges KV team artifacts", async ({ expect }) => {
+		const kv = new MemoryKV();
+		const env = { ARTIFACT_STORE: "kv", ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, ARTIFACTS_KV: kv as unknown as KVNamespace, INTERNAL_ACCESS_BYPASS: "true", TURBO_TOKEN: TOKEN } satisfies Env;
+		await kv.put(`v1/team/${TEAM_ID}/artifact/one`, new Uint8Array([1, 2]), { metadata: kvMetadata({ duration: "1" }, 2) });
+		await kv.put(`v1/team/${OTHER_TEAM_ID}/artifact/two`, new Uint8Array([3]), { metadata: kvMetadata({ duration: "1" }, 1) });
+
+		const stats = await handleRequest(new Request(`${BASE_URL}/internal/teams/${TEAM_ID}/stats`), env, createExecutionContext());
+		expect(await stats.json()).toEqual({ bytes: 2, objects: 1, team: TEAM_ID });
+
+		const purge = await handleRequest(new Request(`${BASE_URL}/internal/teams/${TEAM_ID}/purge-all`, { method: "POST" }), env, createExecutionContext());
+		expect(await purge.json()).toEqual({ deleted: 1, team: TEAM_ID });
+		expect(kv.entries.has(`v1/team/${TEAM_ID}/artifact/one`)).toBe(false);
+		expect(kv.entries.has(`v1/team/${OTHER_TEAM_ID}/artifact/two`)).toBe(true);
+	});
+
 	it("supports no-team single-tenant artifact requests", async ({ expect }) => {
 		const artifactId = randomArtifactId();
 		const body = new Uint8Array([5, 5, 5]);
@@ -1204,6 +1283,42 @@ class HeadOnlyBucket {
 			writeHttpMetadata() {},
 		} as unknown as R2Object;
 	}
+}
+
+interface MemoryKVEntry {
+	body: Uint8Array;
+	metadata?: unknown;
+}
+
+class MemoryKV {
+	readonly entries = new Map<string, MemoryKVEntry>();
+
+	async delete(key: string): Promise<void> {
+		this.entries.delete(key);
+	}
+
+	async getWithMetadata<Metadata>(key: string): Promise<{ metadata: Metadata | null; value: ReadableStream | null }> {
+		const entry = this.entries.get(key);
+		const body = entry?.body.buffer.slice(entry.body.byteOffset, entry.body.byteOffset + entry.body.byteLength) as ArrayBuffer | undefined;
+		return entry === undefined || body === undefined ? { metadata: null, value: null } : { metadata: (entry.metadata ?? null) as Metadata | null, value: new Response(body).body };
+	}
+
+	async list<Metadata>(options: KVNamespaceListOptions): Promise<KVNamespaceListResult<Metadata, string>> {
+		const keys = [...this.entries.entries()]
+			.filter(([key]) => key.startsWith(options.prefix ?? ""))
+			.map(([name, entry]) => ({ name, metadata: entry.metadata as Metadata }));
+
+		return { cacheStatus: null, cursor: "", keys, list_complete: true } as KVNamespaceListResult<Metadata, string>;
+	}
+
+	async put(key: string, value: ArrayBuffer | ArrayBufferView, options?: KVNamespacePutOptions): Promise<void> {
+		const body = value instanceof ArrayBuffer ? new Uint8Array(value) : new Uint8Array(value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength));
+		this.entries.set(key, { body, metadata: options?.metadata });
+	}
+}
+
+function kvMetadata(metadata: Record<string, string>, size: number): Record<string, string> {
+	return { ...metadata, httpEtag: `"${crypto.randomUUID()}"`, size: size.toString(), uploaded: new Date().toISOString() };
 }
 
 class TokenAdminDb {

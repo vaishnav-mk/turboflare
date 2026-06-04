@@ -1,9 +1,16 @@
 import { CacheStatus, isCacheStatus } from "@turboflare/protocol";
 
+export enum ArtifactStore {
+	Kv = "kv",
+	R2 = "r2",
+}
+
 export interface Env {
 	INTERNAL_ACCESS_AUD?: string;
 	ANALYTICS?: AnalyticsEngineDataset;
 	ARTIFACT_INDEX?: D1Database;
+	ARTIFACT_STORE?: string;
+	ARTIFACTS_KV?: KVNamespace;
 	ARTIFACTS: R2Bucket;
 	CACHE_API_MAX_BYTES?: string;
 	CACHE_API_READS?: string;
@@ -23,6 +30,7 @@ export interface Env {
 }
 
 export interface AppConfig {
+	artifactStore: ArtifactStore;
 	cacheApiMaxBytes: number;
 	cacheApiReads: boolean;
 	cacheStatus: CacheStatus;
@@ -43,6 +51,7 @@ const DEFAULT_RETENTION_DAYS = 30;
 
 export function appConfig(env: Env): AppConfig {
 	return {
+		artifactStore: artifactStore(env.ARTIFACT_STORE),
 		cacheApiMaxBytes: numberValue(env.CACHE_API_MAX_BYTES, DEFAULT_CACHE_API_MAX_BYTES),
 		cacheApiReads: isTruthy(env.CACHE_API_READS),
 		cacheStatus: env.CACHE_STATUS !== undefined && isCacheStatus(env.CACHE_STATUS) ? env.CACHE_STATUS : CacheStatus.Enabled,
@@ -56,6 +65,10 @@ export function appConfig(env: Env): AppConfig {
 		readOnly: isTruthy(env.READ_ONLY),
 		retentionDays: numberValue(env.RETENTION_DAYS, DEFAULT_RETENTION_DAYS),
 	};
+}
+
+function artifactStore(value: string | undefined): ArtifactStore {
+	return value?.toLowerCase() === ArtifactStore.Kv ? ArtifactStore.Kv : ArtifactStore.R2;
 }
 
 function csvValue(value: string | undefined): readonly string[] {

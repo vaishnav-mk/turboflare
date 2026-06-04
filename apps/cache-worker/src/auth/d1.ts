@@ -1,4 +1,5 @@
 import type { Env } from "../app/env";
+import { sha256Hex } from "../shared/hash";
 import { parseJsonArray } from "../shared/json";
 import { AuthScope, type AuthContext } from "./types";
 
@@ -33,8 +34,7 @@ export async function authenticateD1Token(env: Env, token: string, now = Date.no
 }
 
 export async function hashToken(token: string): Promise<string> {
-	const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
-	return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+	return sha256Hex(token);
 }
 
 function parseScopes(value: string): readonly AuthScope[] {

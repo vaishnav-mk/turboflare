@@ -7,6 +7,20 @@ import { parseDurationMs } from "../shared/duration";
 import type { TenantContext } from "../tenancy/types";
 import { MAX_CUSTOM_METADATA_BYTES, OCTET_STREAM } from "./constants";
 
+export interface ArtifactMetadataObject {
+	customMetadata?: Record<string, string>;
+	httpEtag: string;
+	httpMetadata?: {
+		contentType?: string;
+	};
+	size: number;
+	uploaded: Date;
+}
+
+export interface ArtifactBodyObject extends ArtifactMetadataObject {
+	body: ReadableStream;
+}
+
 export function artifactCustomMetadata(
 	request: Request,
 	url: URL,
@@ -44,7 +58,7 @@ export function artifactCustomMetadata(
 	return metadata;
 }
 
-export function artifactResponseHeaders(object: R2Object | R2ObjectBody): Headers {
+export function artifactResponseHeaders(object: ArtifactMetadataObject): Headers {
 	const metadata = object.customMetadata ?? {};
 	const headers = new Headers();
 	headers.set("Content-Type", object.httpMetadata?.contentType ?? OCTET_STREAM);
@@ -58,7 +72,7 @@ export function artifactResponseHeaders(object: R2Object | R2ObjectBody): Header
 	return headers;
 }
 
-export function lookupHit(object: R2Object): ArtifactLookupHit {
+export function lookupHit(object: ArtifactMetadataObject): ArtifactLookupHit {
 	const metadata = object.customMetadata ?? {};
 	return {
 		size: object.size,

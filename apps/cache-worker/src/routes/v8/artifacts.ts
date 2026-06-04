@@ -5,11 +5,11 @@ import { appConfig, type Env } from "../../app/env";
 import type { AuthContext } from "../../auth/types";
 import { recordMetric } from "../../observability/metrics";
 import { MetricEvent } from "../../observability/types";
+import { artifactStoreUnavailable, getArtifactObject, headArtifactObject, kvUploadLimitError, putArtifactObject } from "../../storage/artifacts";
 import { artifactCache, cacheableResponse, cacheRequest } from "../../storage/cache-api";
 import { indexArtifact } from "../../storage/index";
 import { artifactKey } from "../../storage/keys";
 import { artifactCustomMetadata, artifactResponseHeaders } from "../../storage/metadata";
-import { getR2Artifact, headR2Artifact, putR2Artifact } from "../../storage/r2";
 import type { TenantContext } from "../../tenancy/types";
 
 export async function handleArtifact(request: Request, env: Env, ctx: ExecutionContext, tenant: TenantContext, artifactId: string, authContext: AuthContext): Promise<Response> {
@@ -39,6 +39,11 @@ async function putArtifact(request: Request, env: Env, ctx: ExecutionContext, te
 		return errorResponse(413, "artifact_too_large", "Artifact upload exceeds configured size limit");
 	}
 
+	const storeError = artifactStoreUnavailable(env) ?? kvUploadLimitError(env, contentLength);
+	if (storeError !== null) {
+		return storeError;
+	}
+
 	const contentType = request.headers.get("Content-Type");
 	if (contentType !== null && contentType.toLowerCase() !== "application/octet-stream") {
 		return errorResponse(400, "bad_request", "Artifact upload must use application/octet-stream");
@@ -58,7 +63,7 @@ async function putArtifact(request: Request, env: Env, ctx: ExecutionContext, te
 		return customMetadata;
 	}
 
-	const object = await putR2Artifact(env, key, request.body, customMetadata);
+	const object = await putArtifactObject(env, key, request.body, customMetadata);
 	ctx.waitUntil(indexArtifact(env, { artifactId, authContext, customMetadata, key, object, tenant }).catch(() => undefined));
 	recordMetric(env, ctx, { artifactId, event: MetricEvent.Put, method: request.method, status: 200, tenant: tenant.key, tokenId: authContext.tokenId });
 	return jsonResponse({ urls: [] });
@@ -79,7 +84,12 @@ async function getArtifact(env: Env, ctx: ExecutionContext, tenant: TenantContex
 		}
 	}
 
-	const object = await getR2Artifact(env, key);
+	const storeError = artifactStoreUnavailable(env);
+	if (storeError !== null) {
+		return storeError;
+	}
+
+	const object = await getArtifactObject(env, key);
 	if (object === null) {
 		recordMetric(env, ctx, { artifactId, event: MetricEvent.GetMiss, method: HttpMethod.Get, status: 404, tenant: tenant.key });
 		return new Response(null, { status: 404 });
@@ -103,7 +113,12 @@ async function headArtifact(env: Env, ctx: ExecutionContext, tenant: TenantConte
 		return key;
 	}
 
-	const object = await headR2Artifact(env, key);
+	const storeError = artifactStoreUnavailable(env);
+	if (storeError !== null) {
+		return storeError;
+	}
+
+	const object = await headArtifactObject(env, key);
 	if (object === null) {
 		recordMetric(env, ctx, { artifactId, event: MetricEvent.HeadMiss, method: HttpMethod.Head, status: 404, tenant: tenant.key });
 		return new Response(null, { status: 404 });

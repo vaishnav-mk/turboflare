@@ -2,13 +2,14 @@ import type { Env } from "../app/env";
 import type { AuthContext } from "../auth/types";
 import { parseDurationMs } from "../shared/duration";
 import type { TenantContext } from "../tenancy/types";
+import type { ArtifactMetadataObject } from "./metadata";
 
 export interface ArtifactIndexInput {
 	artifactId: string;
 	authContext: AuthContext;
 	customMetadata: Record<string, string>;
 	key: string;
-	object: R2Object;
+	object: ArtifactMetadataObject;
 	tenant: TenantContext;
 }
 
