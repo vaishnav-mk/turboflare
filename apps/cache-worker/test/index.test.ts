@@ -8,6 +8,9 @@ const BASE_URL = "https://cache.turboflare.test";
 const TOKEN = "test-token";
 const ROTATED_TOKEN = "rotated-token";
 const TEAM_ID = "team_turboflare";
+const OTHER_TEAM_ID = "team_other";
+const SCOPED_READ_TOKEN = "scoped-read-token";
+const SCOPED_WRITE_TOKEN = "scoped-write-token";
 
 afterEach(async () => {
 	await reset();
@@ -172,6 +175,70 @@ describe("cache worker", () => {
 		});
 	});
 
+	it("rejects scoped tokens without write scope", async ({ expect }) => {
+		const response = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${randomArtifactId()}?teamId=${TEAM_ID}`, {
+				method: "PUT",
+				headers: {
+					Authorization: `Bearer ${SCOPED_READ_TOKEN}`,
+					"Content-Type": "application/octet-stream",
+				},
+				body: new Uint8Array([1]),
+			}),
+			scopedEnv(),
+			createExecutionContext()
+		);
+
+		expect(response.status).toBe(403);
+		expect(await response.json()).toEqual({
+			error: {
+				code: "forbidden",
+				message: "Token does not have the required scope",
+			},
+		});
+	});
+
+	it("rejects scoped tokens for other teams", async ({ expect }) => {
+		const response = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${randomArtifactId()}?teamId=${OTHER_TEAM_ID}`, {
+				method: "GET",
+				headers: {
+					Authorization: `Bearer ${SCOPED_WRITE_TOKEN}`,
+				},
+			}),
+			scopedEnv(),
+			createExecutionContext()
+		);
+
+		expect(response.status).toBe(403);
+		expect(await response.json()).toEqual({
+			error: {
+				code: "forbidden",
+				message: "Token cannot access this team",
+			},
+		});
+	});
+
+	it("allows scoped write tokens for their team", async ({ expect }) => {
+		const artifactId = randomArtifactId();
+		const response = await handleRequest(
+			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+				method: "PUT",
+				headers: {
+					Authorization: `Bearer ${SCOPED_WRITE_TOKEN}`,
+					"Content-Type": "application/octet-stream",
+				},
+				body: new Uint8Array([1, 2, 3]),
+			}),
+			scopedEnv(),
+			createExecutionContext()
+		);
+
+		expect(response.status).toBe(200);
+		const stored = await (workerEnv as unknown as Env).ARTIFACTS.head(`v1/team/${TEAM_ID}/artifact/${artifactId}`);
+		expect(stored?.customMetadata?.tokenId).toBe("ci-write");
+	});
+
 	it("supports the team query alias used by existing cache servers", async ({ expect }) => {
 		const artifactId = randomArtifactId();
 		const body = new Uint8Array([3, 1, 4]);
@@ -261,6 +328,16 @@ function fetchAuthed(path: string, init: RequestInit = {}, token = TOKEN): Promi
 	const headers = new Headers(init.headers);
 	headers.set("Authorization", `Bearer ${token}`);
 	return SELF.fetch(`${BASE_URL}${path}`, { ...init, headers });
+}
+
+function scopedEnv(): Env {
+	return {
+		ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS,
+		TURBO_TOKEN_SCOPES: JSON.stringify([
+			{ id: "ci-read", scopes: ["read"], teams: [TEAM_ID], token: SCOPED_READ_TOKEN },
+			{ id: "ci-write", scopes: ["read", "write"], teams: [TEAM_ID], token: SCOPED_WRITE_TOKEN },
+		]),
+	};
 }
 
 function randomArtifactId(): string {
