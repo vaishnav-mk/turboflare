@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -25,15 +25,16 @@ interface StoredObject {
 }
 
 interface TurboFixture {
-	counterPath: string;
 	directory: string;
 }
 
 const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const REPO_ROOT = join(PACKAGE_ROOT, "..", "..");
+const COMPLEX_FIXTURE_ROOT = join(REPO_ROOT, "fixtures", "complex-turbo-monorepo");
 const TURBO_BIN = join(REPO_ROOT, "node_modules", ".bin", "turbo");
 const TURBO_TOKEN = "fixture-token";
 const TURBO_TEAM = "team_fixture";
+const GENERATED_DIRECTORIES = new Set([".next", ".turbo", "dist", "node_modules"]);
 
 const cleanupTasks: Array<() => Promise<void>> = [];
 
@@ -42,85 +43,56 @@ afterEach(async () => {
 });
 
 describe("real turbo fixture", () => {
-	it("restores a remote cache hit on the second run", async ({ expect }) => {
+	it("restores a complex monorepo from remote cache on the second run", async ({ expect }) => {
 		const artifacts = new MemoryR2Bucket();
 		const server = await startWorkerServer({ ARTIFACTS: artifacts as unknown as R2Bucket, TURBO_TOKEN });
 		cleanupTasks.push(server.close);
 
 		const fixture = await createTurboFixture();
 		cleanupTasks.push(() => rm(fixture.directory, { force: true, recursive: true }));
-		cleanupTasks.push(() => rm(fixture.counterPath, { force: true }));
 
-		const first = await runTurbo(fixture.directory, server.url);
+		const first = await runTurbo(fixture, server.url);
 		expect(first.stdout).toMatch(/cache miss/i);
-		const firstHash = cacheHash(first.stdout);
-		expect(artifacts.objects.size).toBeGreaterThan(0);
-		expect(await readFile(fixture.counterPath, "utf8")).toBe("1");
+		const firstHashes = cacheHashes(first.stdout);
+		expect(firstHashes.length).toBeGreaterThanOrEqual(6);
+		expect(artifacts.objects.size).toBeGreaterThanOrEqual(6);
 
-		await rm(join(fixture.directory, ".turbo"), { force: true, recursive: true });
-		await rm(join(fixture.directory, "dist"), { force: true, recursive: true });
+		await removeGeneratedDirectories(fixture.directory);
 		expect((await runProcess("git", ["status", "--porcelain"], fixture.directory)).stdout).toBe("");
 
-		const second = await runTurbo(fixture.directory, server.url);
-		expect(cacheHash(second.stdout)).toBe(firstHash);
+		const second = await runTurbo(fixture, server.url);
+		expect(cacheHashes(second.stdout)).toEqual(firstHashes);
 		expect(second.stdout).toMatch(/cache hit/i);
-		expect(await readFile(fixture.counterPath, "utf8")).toBe("1");
-		expect(await readFile(join(fixture.directory, "dist", "output.txt"), "utf8")).toBe("run 1\n");
+		await expectNonEmptyDirectory(join(fixture.directory, "apps", "web", ".next"));
+		await expectNonEmptyDirectory(join(fixture.directory, "apps", "api", "dist"));
+		await expectNonEmptyDirectory(join(fixture.directory, "apps", "docs", "dist"));
+		await expectNonEmptyDirectory(join(fixture.directory, "apps", "dashboard", "dist"));
+		await expectNonEmptyDirectory(join(fixture.directory, "packages", "ui", "dist"));
+		await expectNonEmptyDirectory(join(fixture.directory, "packages", "math", "dist"));
 	});
 });
 
 async function createTurboFixture(): Promise<TurboFixture> {
 	const directory = await mkdtemp(join(tmpdir(), "turboflare-turbo-"));
-	const counterPath = `${directory}.runs`;
-	await writeFile(
-		join(directory, "package.json"),
-		JSON.stringify(
-			{
-				name: "turboflare-fixture",
-				packageManager: "pnpm@11.5.0",
-				private: true,
-				scripts: {
-					build: "node build.mjs",
-				},
-			},
-			null,
-			2
-		)
-	);
-	await writeFile(join(directory, ".gitignore"), ".runs\n.turbo\nnode_modules\n");
-	await writeFile(
-		join(directory, "pnpm-lock.yaml"),
-		["lockfileVersion: '9.0'", "", "settings:", "  autoInstallPeers: true", "  excludeLinksFromLockfile: false", "", "importers:", "", "  .: {}", ""].join("\n")
-	);
-	await writeFile(join(directory, "turbo.json"), JSON.stringify({ tasks: { build: { outputs: ["dist/**"] } } }, null, 2));
-	await writeFile(
-		join(directory, "build.mjs"),
-		[
-			'import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";',
-			`const counterPath = ${JSON.stringify(counterPath)};`,
-			'const count = existsSync(counterPath) ? Number(readFileSync(counterPath, "utf8")) + 1 : 1;',
-			'writeFileSync(counterPath, String(count));',
-			'mkdirSync("dist", { recursive: true });',
-			'writeFileSync("dist/output.txt", `run ${count}\\n`);',
-		].join("\n")
-	);
+	await cp(COMPLEX_FIXTURE_ROOT, directory, { recursive: true });
+	await runProcess("pnpm", ["install", "--frozen-lockfile"], directory);
 	await runProcess("git", ["init"], directory);
 	await runProcess("git", ["add", "."], directory);
 	await runProcess("git", ["-c", "user.email=turboflare@example.com", "-c", "user.name=turboflare", "commit", "-m", "init"], directory);
-	return { counterPath, directory };
+	return { directory };
 }
 
-function cacheHash(stdout: string): string {
-	const match = stdout.match(/cache (?:miss|hit).*?([a-f0-9]{16})/i);
-	if (match === null) {
+function cacheHashes(stdout: string): string[] {
+	const matches = [...stdout.matchAll(/cache (?:miss|hit).*?([a-f0-9]{16})/gi)].map((match) => match[1]).sort();
+	if (matches.length === 0) {
 		throw new Error(stdout);
 	}
 
-	return match[1];
+	return matches;
 }
 
-function runTurbo(cwd: string, turboApi: string): Promise<{ stderr: string; stdout: string }> {
-	return runProcess(TURBO_BIN, ["run", "build", "--output-logs=full"], cwd, {
+function runTurbo(fixture: TurboFixture, turboApi: string): Promise<{ stderr: string; stdout: string }> {
+	return runProcess(TURBO_BIN, ["run", "build", "--output-logs=full"], fixture.directory, {
 		FORCE_COLOR: "0",
 		NO_COLOR: "1",
 		TURBO_API: turboApi,
@@ -129,6 +101,38 @@ function runTurbo(cwd: string, turboApi: string): Promise<{ stderr: string; stdo
 		TURBO_TELEMETRY_DISABLED: "1",
 		TURBO_TOKEN,
 	});
+}
+
+async function removeGeneratedDirectories(root: string): Promise<void> {
+	const entries = await readdir(root, { withFileTypes: true });
+
+	await Promise.all(
+		entries.map(async (entry) => {
+			const path = join(root, entry.name);
+			if (!entry.isDirectory()) {
+				return;
+			}
+
+			if (GENERATED_DIRECTORIES.has(entry.name)) {
+				await rm(path, { force: true, recursive: true });
+				return;
+			}
+
+			await removeGeneratedDirectories(path);
+		})
+	);
+}
+
+async function expectNonEmptyDirectory(path: string): Promise<void> {
+	const info = await stat(path);
+	if (!info.isDirectory()) {
+		throw new Error(`${path} is not a directory`);
+	}
+
+	const entries = await readdir(path);
+	if (entries.length === 0) {
+		throw new Error(`${path} is empty`);
+	}
 }
 
 function runProcess(command: string, args: readonly string[], cwd: string, env: NodeJS.ProcessEnv = {}): Promise<{ stderr: string; stdout: string }> {
