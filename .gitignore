@@ -4,6 +4,7 @@
 
 # Dependencies
 /node_modules/
+**/node_modules/
 /.pnpm-store/
 
 # Turborepo and package-manager caches
