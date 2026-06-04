@@ -1,5 +1,6 @@
 import type { Env } from "../app/env";
 import type { AuthContext } from "../auth/types";
+import { parseDurationMs } from "../shared/duration";
 import type { TenantContext } from "../tenancy/types";
 
 export interface ArtifactIndexInput {
@@ -27,7 +28,7 @@ export async function indexArtifact(env: Env, input: ArtifactIndexInput): Promis
 			input.tenant.key,
 			input.artifactId,
 			input.object.size,
-			parseDuration(input.customMetadata.duration),
+			parseDurationMs(input.customMetadata.duration),
 			input.customMetadata.tag ?? null,
 			input.customMetadata.sha ?? null,
 			input.customMetadata.dirtyHash ?? null,
@@ -44,13 +45,4 @@ export async function deleteIndexedArtifacts(env: Env, keys: readonly string[]):
 	}
 
 	await Promise.all(keys.map((key) => env.ARTIFACT_INDEX?.prepare(DELETE_ARTIFACT_QUERY).bind(key).run()));
-}
-
-function parseDuration(value: string | undefined): number {
-	if (value === undefined) {
-		return 0;
-	}
-
-	const duration = Number.parseInt(value, 10);
-	return Number.isFinite(duration) && duration >= 0 ? duration : 0;
 }

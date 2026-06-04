@@ -1,4 +1,5 @@
 import type { Env } from "../app/env";
+import { parseJsonArray } from "../shared/json";
 import { ALL_TEAMS } from "./constants";
 import { AuthScope, type AuthContext } from "./types";
 
@@ -44,15 +45,6 @@ function parseScopes(value: string): readonly AuthScope[] {
 function parseTeams(value: string): readonly string[] {
 	const teams = parseJsonArray(value).filter((team): team is string => typeof team === "string" && team.length > 0);
 	return teams;
-}
-
-function parseJsonArray(value: string): unknown[] {
-	try {
-		const parsed = JSON.parse(value) as unknown;
-		return Array.isArray(parsed) ? parsed : [];
-	} catch {
-		return [];
-	}
 }
 
 function isExpired(value: string | null | undefined, now: number): boolean {

@@ -3,6 +3,7 @@ import { errorResponse } from "@turboflare/shared";
 
 import type { AuthContext } from "../auth/types";
 import { recordUtf8ByteLength } from "../shared/bytes";
+import { parseDurationMs } from "../shared/duration";
 import type { TenantContext } from "../tenancy/types";
 import { MAX_CUSTOM_METADATA_BYTES, OCTET_STREAM } from "./constants";
 
@@ -61,7 +62,7 @@ export function lookupHit(object: R2Object): ArtifactLookupHit {
 	const metadata = object.customMetadata ?? {};
 	return {
 		size: object.size,
-		taskDurationMs: parseDuration(metadata.duration),
+		taskDurationMs: parseDurationMs(metadata.duration),
 		...(metadata.tag !== undefined ? { tag: metadata.tag } : {}),
 	};
 }
@@ -76,15 +77,6 @@ function normalizedDuration(value: string | null): string | Response {
 	}
 
 	return value;
-}
-
-function parseDuration(value: string | undefined): number {
-	if (value === undefined) {
-		return 0;
-	}
-
-	const duration = Number.parseInt(value, 10);
-	return Number.isFinite(duration) && duration >= 0 ? duration : 0;
 }
 
 function setMetadata(metadata: Record<string, string>, key: string, value: string | null): void {

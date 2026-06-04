@@ -1,6 +1,7 @@
 import { describe, it } from "vitest";
 
 import { cleanupExpiredArtifacts, type Env } from "../../src";
+import { daysAgo } from "../helpers/time";
 
 interface StoredListObject {
 	key: string;
@@ -70,8 +71,4 @@ class CleanupBucket {
 	async delete(keys: string | string[]): Promise<void> {
 		this.deleted.push(...(Array.isArray(keys) ? keys : [keys]));
 	}
-}
-
-function daysAgo(days: number): Date {
-	return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 }

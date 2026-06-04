@@ -6,7 +6,9 @@ import { CacheStatus } from "@turboflare/protocol";
 
 import { handleRequest, type Env } from "../src";
 import { hashToken } from "../src/auth/d1";
+import { base64UrlBytes } from "../src/shared/base64";
 import { artifactCache, cacheRequest } from "../src/storage/cache-api";
+import { daysAgo } from "./helpers/time";
 
 const BASE_URL = "https://cache.turboflare.test";
 const TOKEN = "test-token";
@@ -1065,23 +1067,14 @@ async function accessFixture(input: { audience?: string; issuer?: string } = {})
 }
 
 async function signJwt(privateKey: CryptoKey, payload: Record<string, unknown>): Promise<string> {
-	const encodedHeader = base64Url(JSON.stringify({ alg: "RS256", kid: "test-key", typ: "JWT" }));
-	const encodedPayload = base64Url(JSON.stringify(payload));
+	const encodedHeader = jwtPart(JSON.stringify({ alg: "RS256", kid: "test-key", typ: "JWT" }));
+	const encodedPayload = jwtPart(JSON.stringify(payload));
 	const signingInput = `${encodedHeader}.${encodedPayload}`;
 	const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", privateKey, new TextEncoder().encode(signingInput));
-	return `${signingInput}.${base64Url(signature)}`;
+	return `${signingInput}.${jwtPart(signature)}`;
 }
 
-function base64Url(value: string | ArrayBuffer): string {
+function jwtPart(value: string | ArrayBuffer): string {
 	const bytes = typeof value === "string" ? new TextEncoder().encode(value) : new Uint8Array(value);
-	let binary = "";
-	for (const byte of bytes) {
-		binary += String.fromCharCode(byte);
-	}
-
-	return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
-}
-
-function daysAgo(days: number): Date {
-	return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+	return base64UrlBytes(bytes);
 }

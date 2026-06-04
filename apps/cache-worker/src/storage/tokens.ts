@@ -2,6 +2,8 @@ import type { Env } from "../app/env";
 import { MAX_BEARER_TOKEN_LENGTH } from "../auth/constants";
 import { hashToken } from "../auth/d1";
 import { AuthScope } from "../auth/types";
+import { base64UrlBytes } from "../shared/base64";
+import { parseJsonArray, unique } from "../shared/json";
 
 export interface TokenRecord {
 	expiresAt: string | null;
@@ -148,15 +150,6 @@ function parseExpiresAt(value: unknown): string | null | false {
 	return Number.isFinite(time) ? new Date(time).toISOString() : false;
 }
 
-function parseJsonArray(value: string): unknown[] {
-	try {
-		const parsed = JSON.parse(value) as unknown;
-		return Array.isArray(parsed) ? parsed : [];
-	} catch {
-		return [];
-	}
-}
-
 function isAuthScope(value: unknown): value is AuthScope {
 	return value === AuthScope.Admin || value === AuthScope.Read || value === AuthScope.Write;
 }
@@ -164,18 +157,5 @@ function isAuthScope(value: unknown): value is AuthScope {
 function generatedToken(): string {
 	const bytes = new Uint8Array(32);
 	crypto.getRandomValues(bytes);
-	return `tf_${base64Url(bytes)}`;
-}
-
-function base64Url(bytes: Uint8Array): string {
-	let binary = "";
-	for (const byte of bytes) {
-		binary += String.fromCharCode(byte);
-	}
-
-	return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
-}
-
-function unique<T>(values: readonly T[]): readonly T[] {
-	return [...new Set(values)];
+	return `tf_${base64UrlBytes(bytes)}`;
 }

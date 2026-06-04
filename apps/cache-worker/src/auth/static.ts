@@ -1,5 +1,6 @@
 import { AuthScope, type StaticTokenRule } from "./types";
 import { ALL_TEAMS, MAX_BEARER_TOKEN_LENGTH } from "./constants";
+import { unique } from "../shared/json";
 
 export function parseAllowedTokens(rawTokens: string | undefined): readonly StaticTokenRule[] {
 	if (rawTokens === undefined) {
@@ -82,8 +83,4 @@ function parseTeams(value: unknown): readonly string[] {
 
 function isAuthScope(value: unknown): value is AuthScope {
 	return value === AuthScope.Admin || value === AuthScope.Read || value === AuthScope.Write;
-}
-
-function unique<T>(values: readonly T[]): readonly T[] {
-	return [...new Set(values)];
 }
