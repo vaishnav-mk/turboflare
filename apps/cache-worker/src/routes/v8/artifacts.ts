@@ -3,6 +3,8 @@ import { errorResponse, jsonResponse, methodNotAllowed } from "@turboflare/share
 
 import { appConfig, type Env } from "../../app/env";
 import type { AuthContext } from "../../auth/types";
+import { recordMetric } from "../../observability/metrics";
+import { MetricEvent } from "../../observability/types";
 import { artifactCache, cacheableResponse, cacheRequest } from "../../storage/cache-api";
 import { artifactKey } from "../../storage/keys";
 import { artifactCustomMetadata, artifactResponseHeaders } from "../../storage/metadata";
@@ -11,7 +13,7 @@ import type { TenantContext } from "../../tenancy/types";
 
 export async function handleArtifact(request: Request, env: Env, ctx: ExecutionContext, tenant: TenantContext, artifactId: string, authContext: AuthContext): Promise<Response> {
 	if (request.method === HttpMethod.Put) {
-		return putArtifact(request, env, tenant, artifactId, authContext);
+		return putArtifact(request, env, ctx, tenant, artifactId, authContext);
 	}
 
 	if (request.method === HttpMethod.Get) {
@@ -19,13 +21,13 @@ export async function handleArtifact(request: Request, env: Env, ctx: ExecutionC
 	}
 
 	if (request.method === HttpMethod.Head) {
-		return headArtifact(env, tenant, artifactId);
+		return headArtifact(env, ctx, tenant, artifactId);
 	}
 
 	return methodNotAllowed([HttpMethod.Get, HttpMethod.Head, HttpMethod.Put, HttpMethod.Options]);
 }
 
-async function putArtifact(request: Request, env: Env, tenant: TenantContext, artifactId: string, authContext: AuthContext): Promise<Response> {
+async function putArtifact(request: Request, env: Env, ctx: ExecutionContext, tenant: TenantContext, artifactId: string, authContext: AuthContext): Promise<Response> {
 	if (appConfig(env).readOnly) {
 		return errorResponse(403, "forbidden", "Remote cache is running in read-only mode");
 	}
@@ -50,6 +52,7 @@ async function putArtifact(request: Request, env: Env, tenant: TenantContext, ar
 	}
 
 	await putR2Artifact(env, key, request.body, customMetadata);
+	recordMetric(env, ctx, { artifactId, event: MetricEvent.Put, method: request.method, status: 200, tenant: tenant.key, tokenId: authContext.tokenId });
 	return jsonResponse({ urls: [] });
 }
 
@@ -63,12 +66,14 @@ async function getArtifact(env: Env, ctx: ExecutionContext, tenant: TenantContex
 	if (config.cacheApiReads) {
 		const cached = await artifactCache().match(cacheRequest(key));
 		if (cached !== undefined) {
+			recordMetric(env, ctx, { artifactId, bytes: numberHeader(cached.headers.get("Content-Length")), event: MetricEvent.GetHit, method: HttpMethod.Get, status: 200, tenant: tenant.key });
 			return cached;
 		}
 	}
 
 	const object = await getR2Artifact(env, key);
 	if (object === null) {
+		recordMetric(env, ctx, { artifactId, event: MetricEvent.GetMiss, method: HttpMethod.Get, status: 404, tenant: tenant.key });
 		return new Response(null, { status: 404 });
 	}
 
@@ -80,10 +85,11 @@ async function getArtifact(env: Env, ctx: ExecutionContext, tenant: TenantContex
 		ctx.waitUntil(artifactCache().put(cacheRequest(key), cacheableResponse(response.clone(), key)));
 	}
 
+	recordMetric(env, ctx, { artifactId, bytes: object.size, event: MetricEvent.GetHit, method: HttpMethod.Get, status: 200, tenant: tenant.key });
 	return response;
 }
 
-async function headArtifact(env: Env, tenant: TenantContext, artifactId: string): Promise<Response> {
+async function headArtifact(env: Env, ctx: ExecutionContext, tenant: TenantContext, artifactId: string): Promise<Response> {
 	const key = artifactKey(tenant, artifactId);
 	if (key instanceof Response) {
 		return key;
@@ -91,10 +97,21 @@ async function headArtifact(env: Env, tenant: TenantContext, artifactId: string)
 
 	const object = await headR2Artifact(env, key);
 	if (object === null) {
+		recordMetric(env, ctx, { artifactId, event: MetricEvent.HeadMiss, method: HttpMethod.Head, status: 404, tenant: tenant.key });
 		return new Response(null, { status: 404 });
 	}
 
+	recordMetric(env, ctx, { artifactId, bytes: object.size, event: MetricEvent.HeadHit, method: HttpMethod.Head, status: 200, tenant: tenant.key });
 	return new Response(null, {
 		headers: artifactResponseHeaders(object),
 	});
+}
+
+function numberHeader(value: string | null): number | undefined {
+	if (value === null) {
+		return undefined;
+	}
+
+	const number = Number.parseInt(value, 10);
+	return Number.isFinite(number) ? number : undefined;
 }

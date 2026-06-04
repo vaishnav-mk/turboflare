@@ -1,7 +1,11 @@
 import { HttpMethod } from "@turboflare/protocol";
 import { errorResponse, jsonResponse, methodNotAllowed } from "@turboflare/shared";
 
-export async function handleEvents(request: Request, ctx: ExecutionContext): Promise<Response> {
+import type { Env } from "../../app/env";
+import { recordMetric } from "../../observability/metrics";
+import { MetricEvent } from "../../observability/types";
+
+export async function handleEvents(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 	if (request.method === HttpMethod.Get) {
 		return jsonResponse([]);
 	}
@@ -18,6 +22,7 @@ export async function handleEvents(request: Request, ctx: ExecutionContext): Pro
 	}
 
 	ctx.waitUntil(recordEvents(events));
+	recordMetric(env, ctx, { event: MetricEvent.Events, method: request.method, status: 200 });
 	return jsonResponse({ accepted: true });
 }
 

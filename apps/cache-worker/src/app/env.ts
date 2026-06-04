@@ -1,6 +1,7 @@
 import { CacheStatus, isCacheStatus } from "@turboflare/protocol";
 
 export interface Env {
+	ANALYTICS?: AnalyticsEngineDataset;
 	ARTIFACTS: R2Bucket;
 	CACHE_API_MAX_BYTES?: string;
 	CACHE_API_READS?: string;

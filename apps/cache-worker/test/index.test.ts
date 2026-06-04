@@ -15,6 +15,12 @@ const OTHER_TEAM_ID = "team_other";
 const SCOPED_READ_TOKEN = "scoped-read-token";
 const SCOPED_WRITE_TOKEN = "scoped-write-token";
 
+interface AnalyticsPoint {
+	blobs?: string[];
+	doubles?: number[];
+	indexes?: string[];
+}
+
 afterEach(async () => {
 	await reset();
 });
@@ -612,6 +618,40 @@ describe("cache worker", () => {
 		});
 
 		expect(response.status).toBe(200);
+	});
+
+	it("emits analytics datapoints without blocking requests", async ({ expect }) => {
+		const points: AnalyticsPoint[] = [];
+		const analytics = { writeDataPoint: (point: AnalyticsPoint) => points.push(point) } as AnalyticsEngineDataset;
+		const env = { ANALYTICS: analytics, ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, TURBO_TOKEN: TOKEN } satisfies Env;
+		const artifactId = randomArtifactId();
+		const requests = [
+			new Request(`${BASE_URL}/v8/artifacts/status`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { method: "OPTIONS" }),
+			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+				method: "PUT",
+				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/octet-stream" },
+				body: new Uint8Array([1]),
+			}),
+			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { method: "HEAD", headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}/v8/artifacts/events?teamId=${TEAM_ID}`, {
+				method: "POST",
+				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
+				body: JSON.stringify([{ event: "HIT", source: "REMOTE", hash: artifactId, duration: 1 }]),
+			}),
+		];
+
+		for (const request of requests) {
+			const ctx = createExecutionContext();
+			const response = await handleRequest(request, env, ctx);
+			await waitOnExecutionContext(ctx);
+			expect(response.status).toBeLessThan(500);
+		}
+
+		expect(points.map((point) => point.blobs?.[0])).toEqual(["status", "preflight", "get_miss", "put", "get_hit", "head_hit", "events"]);
+		expect(points.every((point) => point.indexes?.[0] !== undefined)).toBe(true);
 	});
 });
 

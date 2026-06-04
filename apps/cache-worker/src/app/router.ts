@@ -4,6 +4,8 @@ import { errorResponse } from "@turboflare/shared";
 import type { Env } from "./env";
 import { authenticateBearer, canAccessTenant, hasScope } from "../auth/bearer";
 import { AuthScope } from "../auth/types";
+import { recordMetric } from "../observability/metrics";
+import { MetricEvent } from "../observability/types";
 import { handleHealth } from "../routes/internal/health";
 import { handleArtifact } from "../routes/v8/artifacts";
 import { handleArtifactLookup } from "../routes/v8/batch";
@@ -36,6 +38,7 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
 	}
 
 	if (request.method === HttpMethod.Options) {
+		recordMetric(env, ctx, { event: MetricEvent.Preflight, method: request.method, status: 204 });
 		return preflightResponse();
 	}
 
@@ -53,11 +56,11 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
 	}
 
 	if (url.pathname === ARTIFACT_STATUS_PATH) {
-		return withProtocolHeaders(handleStatus(request, env));
+		return withProtocolHeaders(handleStatus(request, env, ctx));
 	}
 
 	if (url.pathname === ARTIFACT_EVENTS_PATH) {
-		return withProtocolHeaders(await handleEvents(request, ctx));
+		return withProtocolHeaders(await handleEvents(request, env, ctx));
 	}
 
 	const tenant = resolveTenant(url);
