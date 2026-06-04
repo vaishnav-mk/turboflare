@@ -34,7 +34,7 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
 		return health;
 	}
 
-	const internal = handleInternal(request, env);
+	const internal = await handleInternal(request, env);
 	if (internal !== null) {
 		return internal;
 	}

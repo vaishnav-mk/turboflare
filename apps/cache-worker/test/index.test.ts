@@ -52,6 +52,24 @@ describe("cache worker", () => {
 		expect(bypassed.status).toBe(200);
 	});
 
+	it("reports and purges internal team artifacts", async ({ expect }) => {
+		const env = { ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, INTERNAL_ACCESS_BYPASS: "true", TURBO_TOKEN: TOKEN } satisfies Env;
+		await env.ARTIFACTS.put(`v1/team/${TEAM_ID}/artifact/one`, new Uint8Array([1, 2]));
+		await env.ARTIFACTS.put(`v1/team/${TEAM_ID}/artifact/two`, new Uint8Array([3]));
+		await env.ARTIFACTS.put(`v1/team/${OTHER_TEAM_ID}/artifact/three`, new Uint8Array([4]));
+
+		const stats = await handleRequest(new Request(`${BASE_URL}/internal/teams/${TEAM_ID}/stats`), env, createExecutionContext());
+		expect(stats.status).toBe(200);
+		expect(await stats.json()).toEqual({ bytes: 3, objects: 2, team: TEAM_ID });
+
+		const purge = await handleRequest(new Request(`${BASE_URL}/internal/teams/${TEAM_ID}/purge-all`, { method: "POST" }), env, createExecutionContext());
+		expect(purge.status).toBe(200);
+		expect(await purge.json()).toEqual({ deleted: 2, team: TEAM_ID });
+
+		expect(await env.ARTIFACTS.head(`v1/team/${TEAM_ID}/artifact/one`)).toBeNull();
+		expect(await env.ARTIFACTS.head(`v1/team/${OTHER_TEAM_ID}/artifact/three`)).not.toBeNull();
+	});
+
 	it("rejects unauthenticated Turbo requests", async ({ expect }) => {
 		const response = await SELF.fetch(`${BASE_URL}/v8/artifacts/status`);
 
