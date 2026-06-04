@@ -32,14 +32,18 @@ function comparisonMarkdown(withProfile, withoutProfile) {
 	const withSteps = byId(withProfile.steps);
 	const withoutSteps = byId(withoutProfile.steps);
 	const ids = [...new Set([...Object.keys(withSteps), ...Object.keys(withoutSteps)])];
+	const totals = {
+		with: totalDuration(withProfile.steps),
+		without: totalDuration(withoutProfile.steps),
+	};
 	const lines = [
 		"# ci comparison",
 		"",
 		`with turborepo: ${withProfile.success ? "pass" : "fail"}`,
 		`without turborepo: ${withoutProfile.success ? "pass" : "fail"}`,
 		"",
-		"| step | with turborepo | without turborepo | delta | faster |",
-		"| --- | ---: | ---: | ---: | --- |",
+		"| step | with turborepo | without turborepo | delta | % diff | faster |",
+		"| --- | ---: | ---: | ---: | ---: | --- |",
 	];
 
 	for (const id of ids) {
@@ -47,9 +51,12 @@ function comparisonMarkdown(withProfile, withoutProfile) {
 		const withoutStep = withoutSteps[id];
 		const delta = withStep !== undefined && withoutStep !== undefined ? withStep.durationMs - withoutStep.durationMs : undefined;
 		lines.push(
-			`| ${withStep?.label ?? withoutStep?.label ?? id} | ${stepCell(withStep)} | ${stepCell(withoutStep)} | ${deltaCell(delta)} | ${winnerCell(delta)} |`
+			`| ${withStep?.label ?? withoutStep?.label ?? id} | ${stepCell(withStep)} | ${stepCell(withoutStep)} | ${deltaCell(delta)} | ${percentCell(delta, withoutStep?.durationMs)} | ${winnerCell(delta)} |`
 		);
 	}
+	lines.push(
+		`| **total** | **${formatDuration(totals.with)}** | **${formatDuration(totals.without)}** | **${formatSignedDuration(totals.with - totals.without)}** | **${percentCell(totals.with - totals.without, totals.without)}** | **${winnerCell(totals.with - totals.without)}** |`
+	);
 
 	lines.push("", "## command diffs", "");
 
@@ -59,13 +66,22 @@ function comparisonMarkdown(withProfile, withoutProfile) {
 		lines.push(`### ${withStep?.label ?? withoutStep?.label ?? id}`, "", "```diff", `- ${withStep?.command ?? "missing"}`, `+ ${withoutStep?.command ?? "missing"}`, "```", "");
 	}
 
-	lines.push("## output tails", "");
+	lines.push("## stdout tails", "");
 
 	for (const id of ids) {
 		const withStep = withSteps[id];
 		const withoutStep = withoutSteps[id];
 		lines.push(`### ${withStep?.label ?? withoutStep?.label ?? id}`, "", "with turborepo", "", "```txt", withStep?.stdoutTail ?? "missing", "```", "");
 		lines.push("without turborepo", "", "```txt", withoutStep?.stdoutTail ?? "missing", "```", "");
+	}
+
+	lines.push("## stderr tails", "");
+
+	for (const id of ids) {
+		const withStep = withSteps[id];
+		const withoutStep = withoutSteps[id];
+		lines.push(`### ${withStep?.label ?? withoutStep?.label ?? id}`, "", "with turborepo", "", "```txt", withStep?.stderrTail ?? "missing", "```", "");
+		lines.push("without turborepo", "", "```txt", withoutStep?.stderrTail ?? "missing", "```", "");
 	}
 
 	return `${lines.join("\n")}\n`;
@@ -87,6 +103,16 @@ function deltaCell(delta) {
 	return delta === undefined ? "missing" : formatSignedDuration(delta);
 }
 
+function percentCell(delta, baseline) {
+	if (delta === undefined || baseline === undefined || baseline === 0) {
+		return "missing";
+	}
+
+	const percent = (delta / baseline) * 100;
+	const sign = percent > 0 ? "+" : "";
+	return `${sign}${percent.toFixed(1)}%`;
+}
+
 function winnerCell(delta) {
 	if (delta === undefined || delta === 0) {
 		return "tie";
@@ -102,4 +128,8 @@ function formatDuration(durationMs) {
 function formatSignedDuration(durationMs) {
 	const sign = durationMs > 0 ? "+" : "";
 	return `${sign}${formatDuration(durationMs)}`;
+}
+
+function totalDuration(steps) {
+	return steps.reduce((total, step) => total + step.durationMs, 0);
 }
