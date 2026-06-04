@@ -1,0 +1,45 @@
+# Local planning and research docs
+/ARCHITECTURE.md
+/docs/
+
+# Dependencies
+/node_modules/
+/.pnpm-store/
+
+# Turborepo and package-manager caches
+/.turbo/
+**/.turbo/
+/.cache/
+
+# Build outputs
+/dist/
+**/dist/
+/build/
+**/build/
+/coverage/
+**/coverage/
+/.next/
+
+# Cloudflare Workers local state
+/.wrangler/
+/.mf/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS/editor noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
