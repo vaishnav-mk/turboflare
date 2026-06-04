@@ -35,6 +35,10 @@ Current implementation details:
 - `slug`, `teamId`, and `team` query selectors are accepted for compatibility with existing cache servers.
 - Batch lookup is bounded and throttled to avoid unbounded R2 fanout.
 - Read-only mode rejects uploads while preserving read/status/event compatibility.
+- Optional Cache API reads are available after auth with synthetic artifact keys.
+- Optional Analytics Engine metrics are emitted without blocking cache requests.
+- Scheduled R2 cleanup can remove expired artifacts under the versioned key prefix.
+- `/internal/*` routes are separated from Turbo bearer auth and prepared for Cloudflare Access.
 
 Local research and planning docs live under `docs/` and are intentionally ignored until they are ready to publish.
 
@@ -84,12 +88,29 @@ For team-scoped static tokens, set `TURBO_TOKEN_SCOPES` to a JSON array:
 
 Use `TURBO_TOKEN` for simple single-tenant deployments. Use `TURBO_TOKEN_SCOPES` when one Worker serves more than one team.
 
+For hashed D1-backed tokens, bind `TOKEN_DB` and create a `tokens` table with these columns:
+
+```sql
+create table tokens (
+  id text primary key,
+  token_hash text not null unique,
+  teams text not null,
+  scopes text not null,
+  expires_at text,
+  revoked_at text
+);
+```
+
+`token_hash` is the lowercase hex SHA-256 of the raw token. `teams` and `scopes` are JSON arrays, for example `teams = ["team_turboflare"]` and `scopes = ["read", "write"]`.
+
 Optional Worker variables and bindings:
 
 - `CACHE_API_READS=true` enables authenticated Cache API reads with synthetic artifact keys.
 - `CACHE_API_MAX_BYTES` controls the largest artifact eligible for Cache API fill. The default is `10485760`.
 - `ANALYTICS` can be bound to Analytics Engine for non-blocking request metrics.
 - `INTERNAL_ACCESS_BYPASS=true` allows `/internal/*` routes in local tests only. Do not use it for public deployments.
+- `RETENTION_DAYS` controls scheduled R2 artifact cleanup. The default is `30`.
+- `CLEANUP_MAX_DELETE` caps scheduled deletions per run. The default is `1000`.
 
 ## Next Milestones
 
