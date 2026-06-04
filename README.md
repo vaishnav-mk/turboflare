@@ -84,6 +84,13 @@ For team-scoped static tokens, set `TURBO_TOKEN_SCOPES` to a JSON array:
 
 Use `TURBO_TOKEN` for simple single-tenant deployments. Use `TURBO_TOKEN_SCOPES` when one Worker serves more than one team.
 
+Optional Worker variables and bindings:
+
+- `CACHE_API_READS=true` enables authenticated Cache API reads with synthetic artifact keys.
+- `CACHE_API_MAX_BYTES` controls the largest artifact eligible for Cache API fill. The default is `10485760`.
+- `ANALYTICS` can be bound to Analytics Engine for non-blocking request metrics.
+- `INTERNAL_ACCESS_BYPASS=true` allows `/internal/*` routes in local tests only. Do not use it for public deployments.
+
 ## Next Milestones
 
 - Add real Turborepo fixture tests using `TURBO_API`, `TURBO_TOKEN`, `TURBO_TEAM`, and `TURBO_TEAMID`.
