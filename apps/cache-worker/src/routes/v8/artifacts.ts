@@ -29,6 +29,11 @@ async function putArtifact(request: Request, env: Env, tenant: TenantContext, ar
 		return errorResponse(403, "forbidden", "Remote cache is running in read-only mode");
 	}
 
+	const contentType = request.headers.get("Content-Type");
+	if (contentType !== null && contentType.toLowerCase() !== "application/octet-stream") {
+		return errorResponse(400, "bad_request", "Artifact upload must use application/octet-stream");
+	}
+
 	if (request.body === null) {
 		return errorResponse(400, "bad_request", "Artifact upload requires a request body");
 	}
