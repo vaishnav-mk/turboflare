@@ -10,7 +10,7 @@ Be the best self-hostable Turborepo remote cache for teams that want Cloudflare-
 
 ## Current Status
 
-Initial Worker implementation exists. The current app provides the basic Turborepo `/v8/artifacts` protocol on Workers and R2:
+Initial Worker implementation exists. The current app provides the basic Turborepo `/v8/artifacts` protocol on Workers and R2 by default:
 
 - `GET /v8/artifacts/status`
 - `PUT /v8/artifacts/:artifactId`
@@ -29,7 +29,8 @@ Current implementation details:
 - Uploads stream `request.body` directly into `R2.put()`.
 - Downloads stream `R2.get().body` directly to the client.
 - `HEAD` uses `R2.head()`.
-- Turbo metadata is stored in R2 `customMetadata` and returned as headers.
+- Optional KV artifact storage is available with `ARTIFACT_STORE=kv` and `ARTIFACTS_KV`, capped by KV's 25 MiB value limit.
+- Turbo metadata is stored with the selected artifact store and returned as headers.
 - Static bearer auth supports one token or a comma-separated token allowlist.
 - Optional scoped static tokens restrict tokens to read/write scopes and team keys.
 - `slug`, `teamId`, and `team` query selectors are accepted for compatibility with existing cache servers.
@@ -90,6 +91,39 @@ For team-scoped static tokens, set `TURBO_TOKEN_SCOPES` to a JSON array:
 ```
 
 Use `TURBO_TOKEN` for simple single-tenant deployments. Use `TURBO_TOKEN_SCOPES` when one Worker serves more than one team.
+
+## Artifact Storage
+
+R2 is the default and recommended artifact store. It supports the streaming hot path and large binary artifacts:
+
+```jsonc
+{
+  "r2_buckets": [
+    {
+      "binding": "ARTIFACTS",
+      "bucket_name": "turboflare-artifacts"
+    }
+  ]
+}
+```
+
+KV artifact storage is optional for deployments that need it. Enable it explicitly:
+
+```jsonc
+{
+  "vars": {
+    "ARTIFACT_STORE": "kv"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "ARTIFACTS_KV",
+      "id": "<namespace-id>"
+    }
+  ]
+}
+```
+
+KV mode stores the same `v1/team/{teamKey}/artifact/{artifactId}` keys, but it cannot preserve the R2 streaming upload path because KV writes require the Worker to materialize the artifact body. KV values are capped at 25 MiB, and Turboflare rejects larger KV uploads. Keep R2 as the default for normal Turborepo caches.
 
 For hashed D1-backed tokens, bind `TOKEN_DB` and create a `tokens` table with these columns:
 
@@ -179,6 +213,8 @@ Optional Worker variables and bindings:
 - `CACHE_API_READS=true` enables authenticated Cache API reads with synthetic artifact keys.
 - `CACHE_API_MAX_BYTES` controls the largest artifact eligible for Cache API fill. The default is `10485760`.
 - `MAX_ARTIFACT_BYTES` optionally rejects oversized uploads before R2 writes when `Content-Length` is present.
+- `ARTIFACT_STORE=kv` switches artifact bytes to KV. Omit it or set `r2` to use R2.
+- `ARTIFACTS_KV` is required only when `ARTIFACT_STORE=kv`.
 - `ANALYTICS` can be bound to Analytics Engine for non-blocking request metrics.
 - `RATE_LIMITER` can be bound to Cloudflare Workers Rate Limiting. It is enforced after auth with keys shaped as `team:{teamKey}:token:{tokenId}`.
 - `INTERNAL_ACCESS_BYPASS=true` allows `/internal/*` routes in local tests only. Do not use it for public deployments.
