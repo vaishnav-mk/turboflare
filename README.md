@@ -21,7 +21,7 @@ Initial Worker implementation exists. The current app provides the basic Turbore
 - `OPTIONS /v8/artifacts/*`
 - `GET /management/health`
 
-The hot path is intentionally hand-written and small: bearer auth, tenant normalization, versioned R2 key construction, R2 `head`/`get`/`put`, and response header preservation. Hono/OpenAPI-style machinery is reserved for later `/internal/*` control-plane APIs.
+The hot path is intentionally hand-written and small: bearer auth, tenant normalization, versioned R2 key construction, R2 `head`/`get`/`put`, and response header preservation. Control-plane behavior stays under separate `/internal/*` routes.
 
 Current implementation details:
 
@@ -53,7 +53,7 @@ The current baseline was shaped by three deeper references:
 - `ducktors/turborepo-remote-cache`: copy `teamId`/`team`/`slug` compatibility, read-only mode, and future JWT/JWKS ideas; avoid buffered uploads and separate `.tag` objects.
 - `Tapico/tapico-turborepo-remote-cache`: copy comma-separated token rotation; avoid bucket-per-team, per-request storage setup, and secret logging.
 
-The main known gap is tenant-scoped authorization. Static tokens are global today; enterprise mode should add D1/JWT/Access-backed token-to-team scoping before multi-tenant use.
+For multi-tenant deployments, prefer scoped static tokens or D1-backed hashed tokens over global static tokens. `/internal/*` administration is protected separately with Cloudflare Access JWT verification.
 
 ## Development
 
@@ -154,10 +154,9 @@ Optional Worker variables and bindings:
 - `RETENTION_DAYS` controls scheduled R2 artifact cleanup. The default is `30`.
 - `CLEANUP_MAX_DELETE` caps scheduled deletions per run. The default is `1000`.
 
-## Next Milestones
+## Operational Follow-Ups
 
-- Add `/internal/*` token creation, listing, and revocation APIs.
-- Add purge-expired admin route in addition to scheduled cleanup.
-- Add per-team quota and rate-limit enforcement.
-- Add optional indexed metadata mode for larger installations.
-- Polish deployment templates and login/link compatibility.
+- Create production D1 databases and apply `apps/cache-worker/schema/*.sql` when using `TOKEN_DB` or `ARTIFACT_INDEX`.
+- Configure a custom domain if relying on Cache API reads in production.
+- Set `INTERNAL_ACCESS_TEAM_DOMAIN` and `INTERNAL_ACCESS_AUD` before exposing `/internal/*` routes.
+- Bind `RATE_LIMITER`, `ANALYTICS`, `TOKEN_DB`, or `ARTIFACT_INDEX` only when those features are needed.
