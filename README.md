@@ -31,6 +31,7 @@ Current implementation details:
 - `HEAD` uses `R2.head()`.
 - Turbo metadata is stored in R2 `customMetadata` and returned as headers.
 - Static bearer auth supports one token or a comma-separated token allowlist.
+- Optional scoped static tokens restrict tokens to read/write scopes and team keys.
 - `slug`, `teamId`, and `team` query selectors are accepted for compatibility with existing cache servers.
 - Batch lookup is bounded and throttled to avoid unbounded R2 fanout.
 - Read-only mode rejects uploads while preserving read/status/event compatibility.
@@ -57,9 +58,24 @@ pnpm check
 
 Set `TURBO_TOKEN` on the Worker to one token or a comma-separated token allowlist. Turborepo sends it as `Authorization: Bearer <token>`.
 
+For team-scoped static tokens, set `TURBO_TOKEN_SCOPES` to a JSON array:
+
+```json
+[
+  {
+    "id": "ci-write",
+    "token": "secret-token",
+    "teams": ["team_turboflare"],
+    "scopes": ["read", "write"]
+  }
+]
+```
+
+Use `TURBO_TOKEN` for simple single-tenant deployments. Use `TURBO_TOKEN_SCOPES` when one Worker serves more than one team.
+
 ## Next Milestones
 
 - Add real Turborepo fixture tests using `TURBO_API`, `TURBO_TOKEN`, `TURBO_TEAM`, and `TURBO_TEAMID`.
-- Add tenant-scoped token authorization for multi-team deployments.
+- Add D1-backed token storage for runtime token rotation without redeploying.
 - Add optional Cache API acceleration after auth with synthetic cache keys.
 - Add `/internal/*` Access-protected admin routes for stats, purge, and token management.
