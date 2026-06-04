@@ -140,10 +140,45 @@ Access-protected artifact admin routes are also available:
 
 - `POST /internal/artifacts/purge-expired` runs the same bounded retention cleanup as the scheduled Worker.
 
+## Observability
+
+When `ANALYTICS` is bound, Turboflare writes one Analytics Engine datapoint per status, preflight, upload, hit, miss, and event request. The tenant is the index; blobs include event type, method, tenant, sampled artifact ID, and token ID; doubles include status, bytes, and timestamp.
+
+Example dashboard queries:
+
+```sql
+-- Remote hit ratio by team.
+select
+  index1 as team,
+  countIf(blob1 = 'get_hit') / nullIf(countIf(blob1 in ('get_hit', 'get_miss')), 0) as hit_ratio
+from turboflare_metrics
+where timestamp > now() - interval '1' day
+group by team;
+
+-- Upload status distribution.
+select blob3 as team, double1 as status, count() as requests
+from turboflare_metrics
+where blob1 = 'put' and timestamp > now() - interval '1' day
+group by team, status;
+
+-- Preflight volume.
+select blob3 as team, count() as preflights
+from turboflare_metrics
+where blob1 = 'preflight' and timestamp > now() - interval '1' day
+group by team;
+
+-- Bytes served by cache hits.
+select blob3 as team, sum(double2) as bytes
+from turboflare_metrics
+where blob1 in ('get_hit', 'head_hit') and timestamp > now() - interval '1' day
+group by team;
+```
+
 Optional Worker variables and bindings:
 
 - `CACHE_API_READS=true` enables authenticated Cache API reads with synthetic artifact keys.
 - `CACHE_API_MAX_BYTES` controls the largest artifact eligible for Cache API fill. The default is `10485760`.
+- `MAX_ARTIFACT_BYTES` optionally rejects oversized uploads before R2 writes when `Content-Length` is present.
 - `ANALYTICS` can be bound to Analytics Engine for non-blocking request metrics.
 - `RATE_LIMITER` can be bound to Cloudflare Workers Rate Limiting. It is enforced after auth with keys shaped as `team:{teamKey}:token:{tokenId}`.
 - `INTERNAL_ACCESS_BYPASS=true` allows `/internal/*` routes in local tests only. Do not use it for public deployments.
@@ -153,6 +188,89 @@ Optional Worker variables and bindings:
 - `INTERNAL_ACCESS_JWKS` optionally provides the Access JWKS JSON directly for tests or offline deployments.
 - `RETENTION_DAYS` controls scheduled R2 artifact cleanup. The default is `30`.
 - `CLEANUP_MAX_DELETE` caps scheduled deletions per run. The default is `1000`.
+
+Use R2 `Standard` storage for cache artifacts. Infrequent Access is not the default because Turborepo cache artifacts are hot and often short-lived.
+
+R2 custom-domain CDN caching is a separate public-bucket mode, not the default authenticated Worker path. If you use it, configure public access, WAF or equivalent access controls, explicit Cache Rules for non-default file types, and object-size behavior deliberately.
+
+Client-side `TURBO_REMOTE_CACHE_READ_ONLY` is separate from server-side read-only mode. Server-side read-only mode rejects uploads for every client; client-side read-only mode controls whether a given Turbo invocation writes remote artifacts.
+
+R2 event notifications are optional. If you use them for audit or index repair, handlers should be idempotent because object lifecycle cleanup and manual purges can race with notification delivery.
+
+## Deployment
+
+Minimal Worker deployment:
+
+```sh
+pnpm --filter @turboflare/cache-worker run deploy
+```
+
+Apply optional D1 schema files only for the features you bind:
+
+```sh
+wrangler d1 execute <token-db-name> --file apps/cache-worker/schema/001_tokens.sql
+wrangler d1 execute <artifact-index-db-name> --file apps/cache-worker/schema/002_artifact_index.sql
+```
+
+Set secrets out of band:
+
+```sh
+wrangler secret put TURBO_TOKEN --config apps/cache-worker/wrangler.jsonc
+```
+
+Turbo client environment:
+
+```sh
+export TURBO_API="https://cache.example.com"
+export TURBO_TOKEN="..."
+export TURBO_TEAM="team-name"
+turbo run build
+```
+
+GitHub Actions example:
+
+```yaml
+env:
+  TURBO_API: https://cache.example.com
+  TURBO_TEAM: team-name
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+
+steps:
+  - uses: actions/checkout@v6
+  - uses: pnpm/action-setup@v6
+    with:
+      version: 11.5.0
+  - uses: actions/setup-node@v6
+    with:
+      node-version: 24
+      cache: pnpm
+  - run: pnpm install --frozen-lockfile
+  - run: pnpm build
+```
+
+GitLab CI example:
+
+```yaml
+variables:
+  TURBO_API: https://cache.example.com
+  TURBO_TEAM: team-name
+  TURBO_TOKEN: $TURBO_TOKEN
+
+build:
+  image: node:24
+  script:
+    - corepack enable
+    - pnpm install --frozen-lockfile
+    - pnpm build
+```
+
+Expose `/v8/*` publicly behind bearer auth. Keep `/internal/*` behind Cloudflare Access with `INTERNAL_ACCESS_TEAM_DOMAIN` and `INTERNAL_ACCESS_AUD` configured.
+
+## V1 Scope
+
+Turboflare v1 uses environment tokens and internal token APIs instead of implementing the full OAuth `turbo login` device flow. It implements lightweight `/v2/user` and `/v2/teams` metadata for compatibility, but token issuance remains explicit through static secrets or Access-protected internal APIs.
+
+Temporary R2 S3 credential issuance, Terraform modules, and OTEL exporters are intentionally outside the stock `/v8` cache path. Add them as separate control-plane features only if a deployment needs them.
 
 ## Operational Follow-Ups
 
