@@ -38,7 +38,7 @@ Current implementation details:
 - Optional Cache API reads are available after auth with synthetic artifact keys.
 - Optional Analytics Engine metrics are emitted without blocking cache requests.
 - Scheduled R2 cleanup can remove expired artifacts under the versioned key prefix.
-- `/internal/*` routes are separated from Turbo bearer auth and prepared for Cloudflare Access.
+- `/internal/*` routes are separated from Turbo bearer auth and protected by Cloudflare Access JWT verification.
 
 Local research and planning docs live under `docs/` and are intentionally ignored until they are ready to publish.
 
@@ -109,12 +109,17 @@ Optional Worker variables and bindings:
 - `CACHE_API_MAX_BYTES` controls the largest artifact eligible for Cache API fill. The default is `10485760`.
 - `ANALYTICS` can be bound to Analytics Engine for non-blocking request metrics.
 - `INTERNAL_ACCESS_BYPASS=true` allows `/internal/*` routes in local tests only. Do not use it for public deployments.
+- `INTERNAL_ACCESS_TEAM_DOMAIN` is your Access team domain, for example `https://example.cloudflareaccess.com`.
+- `INTERNAL_ACCESS_AUD` is the Access application audience tag. Comma-separated values are accepted.
+- `INTERNAL_ACCESS_JWKS_URL` optionally overrides the Access certs URL.
+- `INTERNAL_ACCESS_JWKS` optionally provides the Access JWKS JSON directly for tests or offline deployments.
 - `RETENTION_DAYS` controls scheduled R2 artifact cleanup. The default is `30`.
 - `CLEANUP_MAX_DELETE` caps scheduled deletions per run. The default is `1000`.
 
 ## Next Milestones
 
-- Add real Turborepo fixture tests using `TURBO_API`, `TURBO_TOKEN`, `TURBO_TEAM`, and `TURBO_TEAMID`.
-- Add D1-backed token storage for runtime token rotation without redeploying.
-- Add optional Cache API acceleration after auth with synthetic cache keys.
-- Add `/internal/*` Access-protected admin routes for stats, purge, and token management.
+- Add `/internal/*` token creation, listing, and revocation APIs.
+- Add purge-expired admin route in addition to scheduled cleanup.
+- Add per-team quota and rate-limit enforcement.
+- Add optional indexed metadata mode for larger installations.
+- Polish deployment templates and login/link compatibility.

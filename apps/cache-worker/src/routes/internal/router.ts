@@ -11,7 +11,7 @@ export async function handleInternal(request: Request, env: Env): Promise<Respon
 		return null;
 	}
 
-	const accessError = requireAccess(request, env);
+	const accessError = await requireAccess(request, env);
 	if (accessError !== null) {
 		return accessError;
 	}

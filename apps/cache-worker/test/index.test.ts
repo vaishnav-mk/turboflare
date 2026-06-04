@@ -52,6 +52,43 @@ describe("cache worker", () => {
 		expect(bypassed.status).toBe(200);
 	});
 
+	it("accepts valid Cloudflare Access assertions for internal routes", async ({ expect }) => {
+		const access = await accessFixture();
+		const response = await handleRequest(
+			new Request(`${BASE_URL}/internal/health`, { headers: { "Cf-Access-Jwt-Assertion": access.token } }),
+			{
+				ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS,
+				INTERNAL_ACCESS_AUD: access.audience,
+				INTERNAL_ACCESS_JWKS: JSON.stringify({ keys: [access.publicJwk] }),
+				INTERNAL_ACCESS_TEAM_DOMAIN: access.issuer,
+				TURBO_TOKEN: TOKEN,
+			},
+			createExecutionContext()
+		);
+
+		expect(response.status).toBe(200);
+	});
+
+	it("rejects Access assertions with the wrong audience", async ({ expect }) => {
+		const access = await accessFixture({ audience: "other-audience" });
+		const response = await handleRequest(
+			new Request(`${BASE_URL}/internal/health`, { headers: { "Cf-Access-Jwt-Assertion": access.token } }),
+			{
+				ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS,
+				INTERNAL_ACCESS_AUD: "expected-audience",
+				INTERNAL_ACCESS_JWKS: JSON.stringify({ keys: [access.publicJwk] }),
+				INTERNAL_ACCESS_TEAM_DOMAIN: access.issuer,
+				TURBO_TOKEN: TOKEN,
+			},
+			createExecutionContext()
+		);
+
+		expect(response.status).toBe(403);
+		expect(await response.json()).toEqual({
+			error: { code: "forbidden", message: "Invalid Cloudflare Access assertion" },
+		});
+	});
+
 	it("reports and purges internal team artifacts", async ({ expect }) => {
 		const env = { ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, INTERNAL_ACCESS_BYPASS: "true", TURBO_TOKEN: TOKEN } satisfies Env;
 		await env.ARTIFACTS.put(`v1/team/${TEAM_ID}/artifact/one`, new Uint8Array([1, 2]));
@@ -710,4 +747,52 @@ function scopedEnv(): Env {
 
 function randomArtifactId(): string {
 	return crypto.randomUUID().replaceAll("-", "");
+}
+
+type TestJsonWebKey = JsonWebKey & { alg?: string; kid?: string; use?: string };
+
+async function accessFixture(input: { audience?: string; issuer?: string } = {}): Promise<{ audience: string; issuer: string; publicJwk: TestJsonWebKey; token: string }> {
+	const audience = input.audience ?? "expected-audience";
+	const issuer = input.issuer ?? "https://turboflare.cloudflareaccess.com";
+	const keyPair = await crypto.subtle.generateKey(
+		{ hash: "SHA-256", modulusLength: 2048, name: "RSASSA-PKCS1-v1_5", publicExponent: new Uint8Array([1, 0, 1]) },
+		true,
+		["sign", "verify"]
+	);
+	const publicJwk = (await crypto.subtle.exportKey("jwk", keyPair.publicKey)) as TestJsonWebKey;
+	publicJwk.alg = "RS256";
+	publicJwk.kid = "test-key";
+	publicJwk.use = "sig";
+
+	return {
+		audience,
+		issuer,
+		publicJwk,
+		token: await signJwt(keyPair.privateKey, {
+			aud: [audience],
+			exp: Math.floor(Date.now() / 1000) + 60,
+			iat: Math.floor(Date.now() / 1000),
+			iss: issuer,
+			sub: "user@example.com",
+			type: "app",
+		}),
+	};
+}
+
+async function signJwt(privateKey: CryptoKey, payload: Record<string, unknown>): Promise<string> {
+	const encodedHeader = base64Url(JSON.stringify({ alg: "RS256", kid: "test-key", typ: "JWT" }));
+	const encodedPayload = base64Url(JSON.stringify(payload));
+	const signingInput = `${encodedHeader}.${encodedPayload}`;
+	const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", privateKey, new TextEncoder().encode(signingInput));
+	return `${signingInput}.${base64Url(signature)}`;
+}
+
+function base64Url(value: string | ArrayBuffer): string {
+	const bytes = typeof value === "string" ? new TextEncoder().encode(value) : new Uint8Array(value);
+	let binary = "";
+	for (const byte of bytes) {
+		binary += String.fromCharCode(byte);
+	}
+
+	return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
