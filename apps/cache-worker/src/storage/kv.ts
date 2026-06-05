@@ -1,12 +1,7 @@
 import type { Env } from "../app/env";
-import { mapWithConcurrency } from "../shared/concurrency";
 import { sha256Hex } from "../shared/hash";
-import type { TenantContext } from "../tenancy/types";
-import { MAX_BATCH_HASHES, OCTET_STREAM, R2_BATCH_HEAD_CONCURRENCY } from "./constants";
-import { artifactKey } from "./keys";
+import { OCTET_STREAM } from "./constants";
 import type { ArtifactBodyObject, ArtifactMetadataObject } from "./metadata";
-import { lookupHit } from "./metadata";
-import { jsonResponse } from "@turboflare/shared";
 
 interface KvArtifactMetadata extends Record<string, string> {
 	httpEtag: string;
@@ -50,26 +45,8 @@ export async function headKvArtifact(env: Env, key: string): Promise<ArtifactMet
 	return kvMetadataObject(result.metadata);
 }
 
-export async function lookupKvArtifacts(env: Env, tenant: TenantContext, artifactIds: readonly string[]): Promise<Response> {
-	if (artifactIds.length > MAX_BATCH_HASHES) {
-		return jsonResponse({ error: { code: "bad_request", message: `Artifact lookup supports at most ${MAX_BATCH_HASHES} hashes` } }, { status: 400 });
-	}
-
-	const entries = await mapWithConcurrency(artifactIds, R2_BATCH_HEAD_CONCURRENCY, async (artifactId) => {
-		const key = artifactKey(tenant, artifactId);
-		if (key instanceof Response) {
-			return [artifactId, null] as const;
-		}
-
-		const object = await headKvArtifact(env, key);
-		return [artifactId, object === null ? null : lookupHit(object)] as const;
-	});
-
-	return jsonResponse(Object.fromEntries(entries));
-}
-
-export async function listKvArtifacts(env: Env, prefix: string, cursor?: string): Promise<{ cursor?: string; objects: readonly KvListedArtifact[]; truncated: boolean }> {
-	const result = await env.ARTIFACTS_KV?.list<KvArtifactMetadata>({ cursor, limit: 1000, prefix });
+export async function listKvArtifacts(env: Env, prefix: string, cursor?: string, limit = 1000): Promise<{ cursor?: string; objects: readonly KvListedArtifact[]; truncated: boolean }> {
+	const result = await env.ARTIFACTS_KV?.list<KvArtifactMetadata>({ cursor, limit, prefix });
 	if (result === undefined) {
 		return { objects: [], truncated: false };
 	}

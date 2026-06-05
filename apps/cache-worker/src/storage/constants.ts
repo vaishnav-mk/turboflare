@@ -4,4 +4,4 @@ export const MAX_CUSTOM_METADATA_BYTES = 8 * 1024;
 export const MAX_KV_VALUE_BYTES = 25 * 1024 * 1024;
 export const MAX_R2_KEY_BYTES = 1024;
 export const OCTET_STREAM = "application/octet-stream";
-export const R2_BATCH_HEAD_CONCURRENCY = 16;
+export const BATCH_HEAD_CONCURRENCY = 16;
