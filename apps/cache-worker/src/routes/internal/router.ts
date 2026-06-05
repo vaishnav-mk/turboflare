@@ -1,5 +1,5 @@
 import type { Env } from "../../app/env";
-import { requireAccess } from "../../auth/access";
+import { requireInternalAdmin } from "../../auth/internal";
 import { errorResponse, methodNotAllowed } from "../../http/response";
 import { handleInternalArtifacts } from "./artifacts";
 import { handleInternalHealth } from "./health";
@@ -12,9 +12,9 @@ export async function handleInternal(request: Request, env: Env): Promise<Respon
 		return null;
 	}
 
-	const accessError = await requireAccess(request, env);
-	if (accessError !== null) {
-		return accessError;
+	const adminError = requireInternalAdmin(request, env);
+	if (adminError !== null) {
+		return adminError;
 	}
 
 	const health = handleInternalHealth(request);

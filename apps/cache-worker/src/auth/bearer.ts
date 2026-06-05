@@ -12,7 +12,10 @@ let cachedTokenRules: readonly StaticTokenRule[] = [];
 
 export async function authenticateBearer(request: Request, env: Env): Promise<AuthContext | null> {
 	const token = readBearerToken(request);
-	if (token === null || token.length > MAX_BEARER_TOKEN_LENGTH) {
+	if (token === null) {
+		return null;
+	}
+	if (token.length > MAX_BEARER_TOKEN_LENGTH) {
 		return null;
 	}
 

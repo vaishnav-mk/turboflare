@@ -2,11 +2,10 @@ import { env as workerEnv } from "cloudflare:workers";
 import { SELF, createExecutionContext, reset, waitOnExecutionContext } from "cloudflare:test";
 import { afterEach, describe, it } from "vitest";
 
-import { CacheStatus } from "@turboflare/protocol";
+import { ARTIFACTS_PATH, ARTIFACT_EVENTS_PATH, ARTIFACT_STATUS_PATH, CacheStatus } from "@turboflare/protocol";
 
 import { handleRequest, type Env } from "../src";
 import { hashToken } from "../src/auth/d1";
-import { base64UrlBytes } from "../src/shared/base64";
 import { artifactCache, cacheRequest } from "../src/storage/cache-api";
 import { daysAgo } from "./helpers/time";
 
@@ -17,11 +16,17 @@ const TEAM_ID = "team_turboflare";
 const OTHER_TEAM_ID = "team_other";
 const SCOPED_READ_TOKEN = "scoped-read-token";
 const SCOPED_WRITE_TOKEN = "scoped-write-token";
+const INTERNAL_ADMIN_TOKEN = "internal-admin-token";
 
 interface AnalyticsPoint {
 	blobs?: string[];
 	doubles?: number[];
 	indexes?: string[];
+}
+
+interface InternalAdminFixture {
+	env: Env;
+	token: string;
 }
 
 afterEach(async () => {
@@ -39,109 +44,68 @@ describe("cache worker", () => {
 	it("separates internal health from Turbo bearer auth", async ({ expect }) => {
 		const bearerOnly = await handleRequest(
 			new Request(`${BASE_URL}/internal/health`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
-			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, TURBO_TOKEN: TOKEN },
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, INTERNAL_ADMIN_TOKEN, TURBO_TOKEN: TOKEN },
 			createExecutionContext()
 		);
-		expect(bearerOnly.status).toBe(401);
+		expect(bearerOnly.status).toBe(403);
 		expect(await bearerOnly.json()).toEqual({
-			error: { code: "unauthorized", message: "Missing Cloudflare Access assertion" },
+			error: { code: "forbidden", message: "Invalid internal admin token" },
 		});
-
-		const bypassed = await handleRequest(
-			new Request(`${BASE_URL}/internal/health`),
-			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, INTERNAL_ACCESS_BYPASS: "true", TURBO_TOKEN: TOKEN },
-			createExecutionContext()
-		);
-		expect(bypassed.status).toBe(200);
 	});
 
-	it("accepts valid Cloudflare Access assertions for internal routes", async ({ expect }) => {
-		const access = await accessFixture();
+	it("requires internal admin token for internal routes", async ({ expect }) => {
 		const response = await handleRequest(
-			new Request(`${BASE_URL}/internal/health`, { headers: { "Cf-Access-Jwt-Assertion": access.token } }),
-			{
-				ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS,
-				INTERNAL_ACCESS_AUD: access.audience,
-				INTERNAL_ACCESS_JWKS: JSON.stringify({ keys: [access.publicJwk] }),
-				INTERNAL_ACCESS_TEAM_DOMAIN: access.issuer,
-				TURBO_TOKEN: TOKEN,
-			},
+			new Request(`${BASE_URL}/internal/health`, { headers: { Authorization: `Bearer ${INTERNAL_ADMIN_TOKEN}` } }),
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, INTERNAL_ADMIN_TOKEN, TURBO_TOKEN: TOKEN },
 			createExecutionContext()
 		);
 
 		expect(response.status).toBe(200);
 	});
 
-	it("rejects Access assertions with the wrong audience", async ({ expect }) => {
-		const access = await accessFixture({ audience: "other-audience" });
+	it("fails closed when internal admin token is not configured", async ({ expect }) => {
 		const response = await handleRequest(
-			new Request(`${BASE_URL}/internal/health`, { headers: { "Cf-Access-Jwt-Assertion": access.token } }),
-			{
-				ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS,
-				INTERNAL_ACCESS_AUD: "expected-audience",
-				INTERNAL_ACCESS_JWKS: JSON.stringify({ keys: [access.publicJwk] }),
-				INTERNAL_ACCESS_TEAM_DOMAIN: access.issuer,
-				TURBO_TOKEN: TOKEN,
-			},
-			createExecutionContext()
-		);
-
-		expect(response.status).toBe(403);
-		expect(await response.json()).toEqual({
-			error: { code: "forbidden", message: "Invalid Cloudflare Access assertion" },
-		});
-	});
-
-	it("returns unavailable when Access certs cannot be fetched", async ({ expect }) => {
-		const access = await accessFixture();
-		const response = await handleRequest(
-			new Request(`${BASE_URL}/internal/health`, { headers: { "Cf-Access-Jwt-Assertion": access.token } }),
-			{
-				ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS,
-				INTERNAL_ACCESS_AUD: access.audience,
-				INTERNAL_ACCESS_JWKS_URL: "not-a-valid-url",
-				INTERNAL_ACCESS_TEAM_DOMAIN: access.issuer,
-				TURBO_TOKEN: TOKEN,
-			},
+			new Request(`${BASE_URL}/internal/health`),
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, TURBO_TOKEN: TOKEN },
 			createExecutionContext()
 		);
 
 		expect(response.status).toBe(503);
 		expect(await response.json()).toEqual({
-			error: { code: "unavailable", message: "Cloudflare Access certs unavailable" },
+			error: { code: "unavailable", message: "Internal admin token is not configured" },
 		});
 	});
 
 	it("reports and purges internal team artifacts", async ({ expect }) => {
-		const env = { ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, INTERNAL_ACCESS_BYPASS: "true", TURBO_TOKEN: TOKEN } satisfies Env;
-		await env.ARTIFACTS.put(`v1/team/${TEAM_ID}/artifact/one`, new Uint8Array([1, 2]));
-		await env.ARTIFACTS.put(`v1/team/${TEAM_ID}/artifact/two`, new Uint8Array([3]));
-		await env.ARTIFACTS.put(`v1/team/${OTHER_TEAM_ID}/artifact/three`, new Uint8Array([4]));
+		const admin = internalAdmin({ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, TURBO_TOKEN: TOKEN } satisfies Env);
+		await admin.env.ARTIFACTS.put(`v1/team/${TEAM_ID}/artifact/one`, new Uint8Array([1, 2]));
+		await admin.env.ARTIFACTS.put(`v1/team/${TEAM_ID}/artifact/two`, new Uint8Array([3]));
+		await admin.env.ARTIFACTS.put(`v1/team/${OTHER_TEAM_ID}/artifact/three`, new Uint8Array([4]));
 
-		const stats = await handleRequest(new Request(`${BASE_URL}/internal/teams/${TEAM_ID}/stats`), env, createExecutionContext());
+		const stats = await handleRequest(internalRequest(`/internal/teams/${TEAM_ID}/stats`, admin), admin.env, createExecutionContext());
 		expect(stats.status).toBe(200);
 		expect(await stats.json()).toEqual({ bytes: 3, objects: 2, team: TEAM_ID });
 
-		const purge = await handleRequest(new Request(`${BASE_URL}/internal/teams/${TEAM_ID}/purge-all`, { method: "POST" }), env, createExecutionContext());
+		const purge = await handleRequest(internalRequest(`/internal/teams/${TEAM_ID}/purge-all`, admin, { method: "POST" }), admin.env, createExecutionContext());
 		expect(purge.status).toBe(200);
 		expect(await purge.json()).toEqual({ deleted: 2, team: TEAM_ID });
 
-		expect(await env.ARTIFACTS.head(`v1/team/${TEAM_ID}/artifact/one`)).toBeNull();
-		expect(await env.ARTIFACTS.head(`v1/team/${OTHER_TEAM_ID}/artifact/three`)).not.toBeNull();
+		expect(await admin.env.ARTIFACTS.head(`v1/team/${TEAM_ID}/artifact/one`)).toBeNull();
+		expect(await admin.env.ARTIFACTS.head(`v1/team/${OTHER_TEAM_ID}/artifact/three`)).not.toBeNull();
 	});
 
 	it("creates lists and revokes internal tokens", async ({ expect }) => {
 		const tokenDb = new TokenAdminDb();
-		const env = { ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, INTERNAL_ACCESS_BYPASS: "true", TOKEN_DB: tokenDb as unknown as D1Database } satisfies Env;
+		const admin = internalAdmin({ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, TOKEN_DB: tokenDb as unknown as D1Database } satisfies Env);
 		const expiresAt = "2027-01-01T00:00:00.000Z";
 
 		const create = await handleRequest(
-			new Request(`${BASE_URL}/internal/tokens`, {
+			internalRequest("/internal/tokens", admin, {
 				body: JSON.stringify({ expiresAt, id: "ci-token", scopes: ["read", "write"], teams: [TEAM_ID], token: "raw-token" }),
 				headers: { "Content-Type": "application/json" },
 				method: "POST",
 			}),
-			env,
+			admin.env,
 			createExecutionContext()
 		);
 
@@ -152,13 +116,13 @@ describe("cache worker", () => {
 		expect(tokenDb.rows.get("ci-token")?.token_hash).toBe(await hashToken("raw-token"));
 		expect(tokenDb.audit.map((row) => [row.action, row.token_id])).toEqual([["create", "ci-token"]]);
 
-		const list = await handleRequest(new Request(`${BASE_URL}/internal/tokens`), env, createExecutionContext());
+		const list = await handleRequest(internalRequest("/internal/tokens", admin), admin.env, createExecutionContext());
 		expect(list.status).toBe(200);
 		expect(await list.json()).toEqual({
 			tokens: [{ expiresAt, id: "ci-token", revokedAt: null, scopes: ["read", "write"], teams: [TEAM_ID] }],
 		});
 
-		const revoke = await handleRequest(new Request(`${BASE_URL}/internal/tokens/ci-token/revoke`, { method: "POST" }), env, createExecutionContext());
+		const revoke = await handleRequest(internalRequest("/internal/tokens/ci-token/revoke", admin, { method: "POST" }), admin.env, createExecutionContext());
 		expect(revoke.status).toBe(200);
 		expect(await revoke.json()).toEqual({ revoked: { id: "ci-token", revokedAt: expect.any(String) } });
 		expect(tokenDb.rows.get("ci-token")?.revoked_at).toEqual(expect.any(String));
@@ -174,9 +138,9 @@ describe("cache worker", () => {
 			{ key: `v1/team/${TEAM_ID}/artifact/new`, uploaded: daysAgo(1) },
 			{ key: `legacy/team/${TEAM_ID}/artifact/old`, uploaded: daysAgo(40) },
 		]);
-		const env = { ARTIFACTS: bucket as unknown as R2Bucket, INTERNAL_ACCESS_BYPASS: "true", RETENTION_DAYS: "30" } satisfies Env;
+		const admin = internalAdmin({ ARTIFACTS: bucket as unknown as R2Bucket, RETENTION_DAYS: "30" } satisfies Env);
 
-		const response = await handleRequest(new Request(`${BASE_URL}/internal/artifacts/purge-expired`, { method: "POST" }), env, createExecutionContext());
+		const response = await handleRequest(internalRequest("/internal/artifacts/purge-expired", admin, { method: "POST" }), admin.env, createExecutionContext());
 
 		expect(response.status).toBe(200);
 		expect(await response.json()).toEqual({ deleted: 1, scanned: 2 });
@@ -184,9 +148,10 @@ describe("cache worker", () => {
 	});
 
 	it("requires token database for internal token routes", async ({ expect }) => {
+		const admin = internalAdmin({ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS } satisfies Env);
 		const response = await handleRequest(
-			new Request(`${BASE_URL}/internal/tokens`),
-			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, INTERNAL_ACCESS_BYPASS: "true" },
+			internalRequest("/internal/tokens", admin),
+			admin.env,
 			createExecutionContext()
 		);
 
@@ -197,7 +162,7 @@ describe("cache worker", () => {
 	});
 
 	it("rejects unauthenticated Turbo requests", async ({ expect }) => {
-		const response = await SELF.fetch(`${BASE_URL}/v8/artifacts/status`);
+		const response = await SELF.fetch(`${BASE_URL}${ARTIFACT_STATUS_PATH}`);
 
 		expect(response.status).toBe(401);
 		expect(await response.json()).toEqual({
@@ -262,7 +227,7 @@ describe("cache worker", () => {
 	});
 
 	it("reports enabled cache status", async ({ expect }) => {
-		const response = await fetchAuthed("/v8/artifacts/status");
+		const response = await fetchAuthed(ARTIFACT_STATUS_PATH);
 
 		expect(response.status).toBe(200);
 		expect(await response.json()).toEqual({ status: "enabled" });
@@ -271,7 +236,7 @@ describe("cache worker", () => {
 	it("reports configured cache status variants", async ({ expect }) => {
 		for (const status of Object.values(CacheStatus)) {
 			const response = await handleRequest(
-				new Request(`${BASE_URL}/v8/artifacts/status`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+				new Request(`${BASE_URL}${ARTIFACT_STATUS_PATH}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
 				{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, CACHE_STATUS: status, TURBO_TOKEN: TOKEN },
 				createExecutionContext()
 			);
@@ -282,7 +247,7 @@ describe("cache worker", () => {
 	});
 
 	it("rejects invalid bearer tokens consistently", async ({ expect }) => {
-		const response = await fetchAuthed("/v8/artifacts/status", {}, "bad-token");
+		const response = await fetchAuthed(ARTIFACT_STATUS_PATH, {}, "bad-token");
 
 		expect(response.status).toBe(401);
 		expect(await response.json()).toEqual({
@@ -294,14 +259,14 @@ describe("cache worker", () => {
 	});
 
 	it("accepts comma-separated bearer token allowlists", async ({ expect }) => {
-		const response = await fetchAuthed("/v8/artifacts/status", {}, ROTATED_TOKEN);
+		const response = await fetchAuthed(ARTIFACT_STATUS_PATH, {}, ROTATED_TOKEN);
 
 		expect(response.status).toBe(200);
 		expect(await response.json()).toEqual({ status: "enabled" });
 	});
 
 	it("allows Turbo preflight headers", async ({ expect }) => {
-		const response = await SELF.fetch(`${BASE_URL}/v8/artifacts/${randomArtifactId()}`, {
+		const response = await SELF.fetch(`${BASE_URL}${ARTIFACTS_PATH}/${randomArtifactId()}`, {
 			method: "OPTIONS",
 			headers: {
 				"Access-Control-Request-Method": "PUT",
@@ -315,7 +280,7 @@ describe("cache worker", () => {
 	});
 
 	it("allows Turbo event preflight headers", async ({ expect }) => {
-		const response = await SELF.fetch(`${BASE_URL}/v8/artifacts/events`, {
+		const response = await SELF.fetch(`${BASE_URL}${ARTIFACT_EVENTS_PATH}`, {
 			method: "OPTIONS",
 			headers: {
 				"Access-Control-Request-Headers": "Authorization, Content-Type",
@@ -338,7 +303,7 @@ describe("cache worker", () => {
 		};
 
 		const response = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${randomArtifactId()}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${randomArtifactId()}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
 			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, RATE_LIMITER: rateLimiter as unknown as RateLimit, TURBO_TOKEN: TOKEN },
 			createExecutionContext()
 		);
@@ -352,7 +317,7 @@ describe("cache worker", () => {
 
 	it("rejects artifacts above the configured upload quota", async ({ expect }) => {
 		const response = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${randomArtifactId()}?teamId=${TEAM_ID}`, {
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${randomArtifactId()}?teamId=${TEAM_ID}`, {
 				body: new Uint8Array([1, 2]),
 				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Length": "2", "Content-Type": "application/octet-stream" },
 				method: "PUT",
@@ -371,7 +336,7 @@ describe("cache worker", () => {
 		const artifactId = randomArtifactId();
 		const body = new Uint8Array([1, 2, 3, 4, 5]);
 
-		const put = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+		const put = await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, {
 			method: "PUT",
 			headers: {
 				"Content-Length": body.byteLength.toString(),
@@ -405,7 +370,7 @@ describe("cache worker", () => {
 		});
 		expect(stored?.customMetadata?.createdAt).toEqual(expect.any(String));
 
-		const get = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`);
+		const get = await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`);
 		expect(get.status).toBe(200);
 		expect(get.headers.get("content-type")).toBe("application/octet-stream");
 		expect(get.headers.get("content-length")).toBe(body.byteLength.toString());
@@ -415,7 +380,7 @@ describe("cache worker", () => {
 		expect(get.headers.get("x-artifact-dirty-hash")).toBe("dirty-hash");
 		expect(new Uint8Array(await get.arrayBuffer())).toEqual(body);
 
-		const head = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+		const head = await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, {
 			method: "HEAD",
 		});
 		expect(head.status).toBe(200);
@@ -430,7 +395,7 @@ describe("cache worker", () => {
 		const env = { ARTIFACT_STORE: "kv", ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, ARTIFACTS_KV: kv as unknown as KVNamespace, TURBO_TOKEN: TOKEN } satisfies Env;
 
 		const put = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, {
 				body,
 				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Length": body.byteLength.toString(), "Content-Type": "application/octet-stream", "x-artifact-duration": "6", "x-artifact-tag": "kv" },
 				method: "PUT",
@@ -440,18 +405,18 @@ describe("cache worker", () => {
 		);
 		expect(put.status).toBe(200);
 
-		const head = await handleRequest(new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` }, method: "HEAD" }), env, createExecutionContext());
+		const head = await handleRequest(new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` }, method: "HEAD" }), env, createExecutionContext());
 		expect(head.status).toBe(200);
 		expect(head.headers.get("content-length")).toBe(body.byteLength.toString());
 		expect(head.headers.get("x-artifact-duration")).toBe("6");
 
-		const get = await handleRequest(new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }), env, createExecutionContext());
+		const get = await handleRequest(new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }), env, createExecutionContext());
 		expect(get.status).toBe(200);
 		expect(get.headers.get("x-artifact-tag")).toBe("kv");
 		expect(new Uint8Array(await get.arrayBuffer())).toEqual(body);
 
 		const lookup = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts?teamId=${TEAM_ID}`, { body: JSON.stringify({ hashes: [artifactId, "missing"] }), headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" }, method: "POST" }),
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}?teamId=${TEAM_ID}`, { body: JSON.stringify({ hashes: [artifactId, "missing"] }), headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" }, method: "POST" }),
 			env,
 			createExecutionContext()
 		);
@@ -463,7 +428,7 @@ describe("cache worker", () => {
 
 	it("requires explicit KV binding for KV artifact store", async ({ expect }) => {
 		const response = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${randomArtifactId()}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${randomArtifactId()}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
 			{ ARTIFACT_STORE: "kv", ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, TURBO_TOKEN: TOKEN },
 			createExecutionContext()
 		);
@@ -474,7 +439,7 @@ describe("cache worker", () => {
 
 	it("caps KV artifact uploads", async ({ expect }) => {
 		const response = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${randomArtifactId()}?teamId=${TEAM_ID}`, {
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${randomArtifactId()}?teamId=${TEAM_ID}`, {
 				body: new Uint8Array([1]),
 				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Length": `${25 * 1024 * 1024 + 1}`, "Content-Type": "application/octet-stream" },
 				method: "PUT",
@@ -489,14 +454,14 @@ describe("cache worker", () => {
 
 	it("reports and purges KV team artifacts", async ({ expect }) => {
 		const kv = new MemoryKV();
-		const env = { ARTIFACT_STORE: "kv", ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, ARTIFACTS_KV: kv as unknown as KVNamespace, INTERNAL_ACCESS_BYPASS: "true", TURBO_TOKEN: TOKEN } satisfies Env;
+		const admin = internalAdmin({ ARTIFACT_STORE: "kv", ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, ARTIFACTS_KV: kv as unknown as KVNamespace, TURBO_TOKEN: TOKEN } satisfies Env);
 		await kv.put(`v1/team/${TEAM_ID}/artifact/one`, new Uint8Array([1, 2]), { metadata: kvMetadata({ duration: "1" }, 2) });
 		await kv.put(`v1/team/${OTHER_TEAM_ID}/artifact/two`, new Uint8Array([3]), { metadata: kvMetadata({ duration: "1" }, 1) });
 
-		const stats = await handleRequest(new Request(`${BASE_URL}/internal/teams/${TEAM_ID}/stats`), env, createExecutionContext());
+		const stats = await handleRequest(internalRequest(`/internal/teams/${TEAM_ID}/stats`, admin), admin.env, createExecutionContext());
 		expect(await stats.json()).toEqual({ bytes: 2, objects: 1, team: TEAM_ID });
 
-		const purge = await handleRequest(new Request(`${BASE_URL}/internal/teams/${TEAM_ID}/purge-all`, { method: "POST" }), env, createExecutionContext());
+		const purge = await handleRequest(internalRequest(`/internal/teams/${TEAM_ID}/purge-all`, admin, { method: "POST" }), admin.env, createExecutionContext());
 		expect(await purge.json()).toEqual({ deleted: 1, team: TEAM_ID });
 		expect(kv.entries.has(`v1/team/${TEAM_ID}/artifact/one`)).toBe(false);
 		expect(kv.entries.has(`v1/team/${OTHER_TEAM_ID}/artifact/two`)).toBe(true);
@@ -506,7 +471,7 @@ describe("cache worker", () => {
 		const artifactId = randomArtifactId();
 		const body = new Uint8Array([5, 5, 5]);
 
-		const put = await fetchAuthed(`/v8/artifacts/${artifactId}`, {
+		const put = await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}`, {
 			body,
 			headers: { "Content-Type": "application/octet-stream" },
 			method: "PUT",
@@ -516,7 +481,7 @@ describe("cache worker", () => {
 		const stored = await (workerEnv as unknown as Env).ARTIFACTS.head(`v1/team/global/artifact/${artifactId}`);
 		expect(stored).not.toBeNull();
 
-		const get = await fetchAuthed(`/v8/artifacts/${artifactId}`);
+		const get = await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}`);
 		expect(new Uint8Array(await get.arrayBuffer())).toEqual(body);
 	});
 
@@ -525,14 +490,14 @@ describe("cache worker", () => {
 		const body = new Uint8Array(1024 * 1024);
 		body.fill(7);
 
-		const put = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+		const put = await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, {
 			body,
 			headers: { "Content-Length": body.byteLength.toString(), "Content-Type": "application/octet-stream" },
 			method: "PUT",
 		});
 		expect(put.status).toBe(200);
 
-		const get = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`);
+		const get = await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`);
 		expect(get.headers.get("content-length")).toBe(body.byteLength.toString());
 		expect((await get.arrayBuffer()).byteLength).toBe(body.byteLength);
 	});
@@ -541,7 +506,7 @@ describe("cache worker", () => {
 		const artifactId = randomArtifactId();
 		const bucket = new HeadOnlyBucket(`v1/team/${TEAM_ID}/artifact/${artifactId}`);
 		const response = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` }, method: "HEAD" }),
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` }, method: "HEAD" }),
 			{ ARTIFACTS: bucket as unknown as R2Bucket, TURBO_TOKEN: TOKEN },
 			createExecutionContext()
 		);
@@ -556,7 +521,7 @@ describe("cache worker", () => {
 		const index = new ArtifactIndexDb();
 		const ctx = createExecutionContext();
 		const response = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, {
 				body: new Uint8Array([1, 2, 3]),
 				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/octet-stream", "x-artifact-duration": "12", "x-artifact-tag": "build#app" },
 				method: "PUT",
@@ -579,7 +544,7 @@ describe("cache worker", () => {
 
 	it("does not fail uploads when artifact indexing fails", async ({ expect }) => {
 		const response = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${randomArtifactId()}?teamId=${TEAM_ID}`, {
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${randomArtifactId()}?teamId=${TEAM_ID}`, {
 				body: new Uint8Array([1]),
 				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/octet-stream" },
 				method: "PUT",
@@ -595,7 +560,7 @@ describe("cache worker", () => {
 		const artifactId = `incremental-${"a".repeat(64)}`;
 		const body = new Uint8Array([9, 9, 9]);
 
-		const put = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+		const put = await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, {
 			method: "PUT",
 			headers: {
 				"Content-Type": "application/octet-stream",
@@ -606,11 +571,11 @@ describe("cache worker", () => {
 
 		expect(put.status).toBe(200);
 
-		const get = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`);
+		const get = await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`);
 		expect(get.status).toBe(200);
 		expect(new Uint8Array(await get.arrayBuffer())).toEqual(body);
 
-		const lookup = await fetchAuthed(`/v8/artifacts?teamId=${TEAM_ID}`, {
+		const lookup = await fetchAuthed(`${ARTIFACTS_PATH}?teamId=${TEAM_ID}`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ hashes: [artifactId] }),
@@ -622,7 +587,7 @@ describe("cache worker", () => {
 	});
 
 	it("rejects unsupported upload content types", async ({ expect }) => {
-		const response = await fetchAuthed(`/v8/artifacts/${randomArtifactId()}?teamId=${TEAM_ID}`, {
+		const response = await fetchAuthed(`${ARTIFACTS_PATH}/${randomArtifactId()}?teamId=${TEAM_ID}`, {
 			method: "PUT",
 			headers: { "Content-Type": "application/json" },
 			body: new Uint8Array([1]),
@@ -640,12 +605,12 @@ describe("cache worker", () => {
 	it("treats duplicate puts as last-writer-wins", async ({ expect }) => {
 		const artifactId = randomArtifactId();
 
-		const first = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+		const first = await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, {
 			method: "PUT",
 			headers: { "Content-Type": "application/octet-stream", "x-artifact-duration": "1", "x-artifact-tag": "first" },
 			body: new Uint8Array([1]),
 		});
-		const second = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+		const second = await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, {
 			method: "PUT",
 			headers: { "Content-Type": "application/octet-stream", "x-artifact-duration": "2", "x-artifact-tag": "second" },
 			body: new Uint8Array([2, 2]),
@@ -654,7 +619,7 @@ describe("cache worker", () => {
 		expect(first.status).toBe(200);
 		expect(second.status).toBe(200);
 
-		const get = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`);
+		const get = await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`);
 		expect(get.headers.get("x-artifact-duration")).toBe("2");
 		expect(get.headers.get("x-artifact-tag")).toBe("second");
 		expect(new Uint8Array(await get.arrayBuffer())).toEqual(new Uint8Array([2, 2]));
@@ -666,7 +631,7 @@ describe("cache worker", () => {
 			httpMetadata: { contentType: "application/octet-stream" },
 		});
 
-		const get = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`);
+		const get = await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`);
 		expect(get.status).toBe(200);
 		expect(get.headers.get("x-artifact-duration")).toBe("0");
 		expect(new Uint8Array(await get.arrayBuffer())).toEqual(new Uint8Array([1, 2]));
@@ -674,7 +639,7 @@ describe("cache worker", () => {
 
 	it("rejects oversized object keys", async ({ expect }) => {
 		const artifactId = "x".repeat(1_200);
-		const response = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+		const response = await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, {
 			method: "PUT",
 			headers: { "Content-Type": "application/octet-stream" },
 			body: new Uint8Array([1]),
@@ -692,11 +657,11 @@ describe("cache worker", () => {
 	it("returns misses without touching response bodies", async ({ expect }) => {
 		const artifactId = randomArtifactId();
 
-		const get = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`);
+		const get = await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`);
 		expect(get.status).toBe(404);
 		expect(await get.text()).toBe("");
 
-		const head = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { method: "HEAD" });
+		const head = await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, { method: "HEAD" });
 		expect(head.status).toBe(404);
 		expect(await head.text()).toBe("");
 	});
@@ -711,7 +676,7 @@ describe("cache worker", () => {
 
 		const fillCtx = createExecutionContext();
 		const first = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
 			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, CACHE_API_READS: "true", TURBO_TOKEN: TOKEN },
 			fillCtx
 		);
@@ -721,7 +686,7 @@ describe("cache worker", () => {
 		await (workerEnv as unknown as Env).ARTIFACTS.delete(key);
 
 		const cached = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
 			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, CACHE_API_READS: "true", TURBO_TOKEN: TOKEN },
 			createExecutionContext()
 		);
@@ -748,12 +713,12 @@ describe("cache worker", () => {
 		const firstCtx = createExecutionContext();
 		const secondCtx = createExecutionContext();
 		await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
 			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, CACHE_API_READS: "true", TURBO_TOKEN: TOKEN },
 			firstCtx
 		);
 		await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${OTHER_TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${OTHER_TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
 			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, CACHE_API_READS: "true", TURBO_TOKEN: TOKEN },
 			secondCtx
 		);
@@ -764,12 +729,12 @@ describe("cache worker", () => {
 		await (workerEnv as unknown as Env).ARTIFACTS.delete(`v1/team/${OTHER_TEAM_ID}/artifact/${artifactId}`);
 
 		const first = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
 			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, CACHE_API_READS: "true", TURBO_TOKEN: TOKEN },
 			createExecutionContext()
 		);
 		const second = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${OTHER_TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${OTHER_TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
 			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, CACHE_API_READS: "true", TURBO_TOKEN: TOKEN },
 			createExecutionContext()
 		);
@@ -788,7 +753,7 @@ describe("cache worker", () => {
 
 		const ctx = createExecutionContext();
 		const first = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
 			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, CACHE_API_MAX_BYTES: "1", CACHE_API_READS: "true", TURBO_TOKEN: TOKEN },
 			ctx
 		);
@@ -799,7 +764,7 @@ describe("cache worker", () => {
 		await (workerEnv as unknown as Env).ARTIFACTS.delete(key);
 
 		const miss = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
 			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, CACHE_API_MAX_BYTES: "1", CACHE_API_READS: "true", TURBO_TOKEN: TOKEN },
 			createExecutionContext()
 		);
@@ -808,7 +773,7 @@ describe("cache worker", () => {
 	});
 
 	it("rejects invalid artifact duration metadata", async ({ expect }) => {
-		const response = await fetchAuthed(`/v8/artifacts/${randomArtifactId()}?teamId=${TEAM_ID}`, {
+		const response = await fetchAuthed(`${ARTIFACTS_PATH}/${randomArtifactId()}?teamId=${TEAM_ID}`, {
 			method: "PUT",
 			headers: {
 				"Content-Type": "application/octet-stream",
@@ -829,7 +794,7 @@ describe("cache worker", () => {
 	it("rejects writes in read-only mode", async ({ expect }) => {
 		const ctx = createExecutionContext();
 		const response = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${randomArtifactId()}?teamId=${TEAM_ID}`, {
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${randomArtifactId()}?teamId=${TEAM_ID}`, {
 				method: "PUT",
 				headers: {
 					Authorization: `Bearer ${TOKEN}`,
@@ -859,7 +824,7 @@ describe("cache worker", () => {
 
 		const ctx = createExecutionContext();
 		const get = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
 			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, READ_ONLY: "true", TURBO_TOKEN: TOKEN },
 			ctx
 		);
@@ -869,7 +834,7 @@ describe("cache worker", () => {
 
 	it("rejects scoped tokens without write scope", async ({ expect }) => {
 		const response = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${randomArtifactId()}?teamId=${TEAM_ID}`, {
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${randomArtifactId()}?teamId=${TEAM_ID}`, {
 				method: "PUT",
 				headers: {
 					Authorization: `Bearer ${SCOPED_READ_TOKEN}`,
@@ -892,7 +857,7 @@ describe("cache worker", () => {
 
 	it("rejects scoped tokens for other teams", async ({ expect }) => {
 		const response = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${randomArtifactId()}?teamId=${OTHER_TEAM_ID}`, {
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${randomArtifactId()}?teamId=${OTHER_TEAM_ID}`, {
 				method: "GET",
 				headers: {
 					Authorization: `Bearer ${SCOPED_WRITE_TOKEN}`,
@@ -914,7 +879,7 @@ describe("cache worker", () => {
 	it("allows scoped write tokens for their team", async ({ expect }) => {
 		const artifactId = randomArtifactId();
 		const response = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, {
 				method: "PUT",
 				headers: {
 					Authorization: `Bearer ${SCOPED_WRITE_TOKEN}`,
@@ -935,7 +900,7 @@ describe("cache worker", () => {
 		const artifactId = randomArtifactId();
 		const body = new Uint8Array([3, 1, 4]);
 
-		const put = await fetchAuthed(`/v8/artifacts/${artifactId}?team=${TEAM_ID}`, {
+		const put = await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}?team=${TEAM_ID}`, {
 			method: "PUT",
 			headers: {
 				"Content-Type": "application/octet-stream",
@@ -944,19 +909,19 @@ describe("cache worker", () => {
 		});
 		expect(put.status).toBe(200);
 
-		const get = await fetchAuthed(`/v8/artifacts/${artifactId}?team=${TEAM_ID}`);
+		const get = await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}?team=${TEAM_ID}`);
 		expect(get.status).toBe(200);
 		expect(new Uint8Array(await get.arrayBuffer())).toEqual(body);
 	});
 
 	it("scopes slug and teamId to separate R2 keys", async ({ expect }) => {
 		const artifactId = randomArtifactId();
-		await fetchAuthed(`/v8/artifacts/${artifactId}?slug=docs`, {
+		await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}?slug=docs`, {
 			method: "PUT",
 			headers: { "Content-Type": "application/octet-stream" },
 			body: new Uint8Array([1]),
 		});
-		await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=team_docs`, {
+		await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}?teamId=team_docs`, {
 			method: "PUT",
 			headers: { "Content-Type": "application/octet-stream" },
 			body: new Uint8Array([2]),
@@ -969,7 +934,7 @@ describe("cache worker", () => {
 	});
 
 	it("ignores x-ai-agent safely", async ({ expect }) => {
-		const response = await fetchAuthed(`/v8/artifacts/${randomArtifactId()}?teamId=${TEAM_ID}`, {
+		const response = await fetchAuthed(`${ARTIFACTS_PATH}/${randomArtifactId()}?teamId=${TEAM_ID}`, {
 			method: "PUT",
 			headers: { "Content-Type": "application/octet-stream", "x-ai-agent": "agent" },
 			body: new Uint8Array([1]),
@@ -983,7 +948,7 @@ describe("cache worker", () => {
 		const missingArtifactId = randomArtifactId();
 		const body = new Uint8Array([8, 6, 7, 5, 3, 0, 9]);
 
-		const put = await fetchAuthed(`/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+		const put = await fetchAuthed(`${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, {
 			method: "PUT",
 			headers: {
 				"Content-Type": "application/octet-stream",
@@ -994,7 +959,7 @@ describe("cache worker", () => {
 		});
 		expect(put.status).toBe(200);
 
-		const lookup = await fetchAuthed(`/v8/artifacts?teamId=${TEAM_ID}`, {
+		const lookup = await fetchAuthed(`${ARTIFACTS_PATH}?teamId=${TEAM_ID}`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -1014,7 +979,7 @@ describe("cache worker", () => {
 	});
 
 	it("bounds artifact lookup fanout", async ({ expect }) => {
-		const response = await fetchAuthed(`/v8/artifacts?teamId=${TEAM_ID}`, {
+		const response = await fetchAuthed(`${ARTIFACTS_PATH}?teamId=${TEAM_ID}`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -1032,7 +997,7 @@ describe("cache worker", () => {
 	});
 
 	it("accepts Turbo analytics events", async ({ expect }) => {
-		const response = await fetchAuthed(`/v8/artifacts/events?teamId=${TEAM_ID}`, {
+		const response = await fetchAuthed(`${ARTIFACT_EVENTS_PATH}?teamId=${TEAM_ID}`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -1045,7 +1010,7 @@ describe("cache worker", () => {
 	});
 
 	it("rejects malformed Turbo analytics events", async ({ expect }) => {
-		const response = await fetchAuthed(`/v8/artifacts/events?teamId=${TEAM_ID}`, {
+		const response = await fetchAuthed(`${ARTIFACT_EVENTS_PATH}?teamId=${TEAM_ID}`, {
 			body: JSON.stringify({ event: "HIT" }),
 			headers: { "Content-Type": "application/json" },
 			method: "POST",
@@ -1058,7 +1023,7 @@ describe("cache worker", () => {
 	});
 
 	it("accepts event variants with and without session ids", async ({ expect }) => {
-		const response = await fetchAuthed(`/v8/artifacts/events?teamId=${TEAM_ID}`, {
+		const response = await fetchAuthed(`${ARTIFACT_EVENTS_PATH}?teamId=${TEAM_ID}`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify([
@@ -1076,17 +1041,17 @@ describe("cache worker", () => {
 		const env = { ANALYTICS: analytics, ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, TURBO_TOKEN: TOKEN } satisfies Env;
 		const artifactId = randomArtifactId();
 		const requests = [
-			new Request(`${BASE_URL}/v8/artifacts/status`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
-			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { method: "OPTIONS" }),
-			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
-			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, {
+			new Request(`${BASE_URL}${ARTIFACT_STATUS_PATH}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, { method: "OPTIONS" }),
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, {
 				method: "PUT",
 				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/octet-stream" },
 				body: new Uint8Array([1]),
 			}),
-			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
-			new Request(`${BASE_URL}/v8/artifacts/${artifactId}?teamId=${TEAM_ID}`, { method: "HEAD", headers: { Authorization: `Bearer ${TOKEN}` } }),
-			new Request(`${BASE_URL}/v8/artifacts/events?teamId=${TEAM_ID}`, {
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}`, { method: "HEAD", headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}${ARTIFACT_EVENTS_PATH}?teamId=${TEAM_ID}`, {
 				method: "POST",
 				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
 				body: JSON.stringify([{ event: "HIT", source: "REMOTE", hash: artifactId, duration: 1 }]),
@@ -1109,7 +1074,7 @@ describe("cache worker", () => {
 		const analytics = { writeDataPoint: () => { throw new Error("analytics down"); } } as unknown as AnalyticsEngineDataset;
 		const ctx = createExecutionContext();
 		const response = await handleRequest(
-			new Request(`${BASE_URL}/v8/artifacts/status`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
+			new Request(`${BASE_URL}${ARTIFACT_STATUS_PATH}`, { headers: { Authorization: `Bearer ${TOKEN}` } }),
 			{ ANALYTICS: analytics, ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, TURBO_TOKEN: TOKEN },
 			ctx
 		);
@@ -1138,8 +1103,6 @@ function scopedEnv(): Env {
 function randomArtifactId(): string {
 	return crypto.randomUUID().replaceAll("-", "");
 }
-
-type TestJsonWebKey = JsonWebKey & { alg?: string; kid?: string; use?: string };
 
 interface TokenAdminRow {
 	expires_at: string | null;
@@ -1357,43 +1320,12 @@ class TokenAdminDb {
 	}
 }
 
-async function accessFixture(input: { audience?: string; issuer?: string } = {}): Promise<{ audience: string; issuer: string; publicJwk: TestJsonWebKey; token: string }> {
-	const audience = input.audience ?? "expected-audience";
-	const issuer = input.issuer ?? "https://turboflare.cloudflareaccess.com";
-	const keyPair = await crypto.subtle.generateKey(
-		{ hash: "SHA-256", modulusLength: 2048, name: "RSASSA-PKCS1-v1_5", publicExponent: new Uint8Array([1, 0, 1]) },
-		true,
-		["sign", "verify"]
-	);
-	const publicJwk = (await crypto.subtle.exportKey("jwk", keyPair.publicKey)) as TestJsonWebKey;
-	publicJwk.alg = "RS256";
-	publicJwk.kid = "test-key";
-	publicJwk.use = "sig";
-
-	return {
-		audience,
-		issuer,
-		publicJwk,
-		token: await signJwt(keyPair.privateKey, {
-			aud: [audience],
-			exp: Math.floor(Date.now() / 1000) + 60,
-			iat: Math.floor(Date.now() / 1000),
-			iss: issuer,
-			sub: "user@example.com",
-			type: "app",
-		}),
-	};
+function internalAdmin(env: Env): InternalAdminFixture {
+	return { env: { ...env, INTERNAL_ADMIN_TOKEN }, token: INTERNAL_ADMIN_TOKEN };
 }
 
-async function signJwt(privateKey: CryptoKey, payload: Record<string, unknown>): Promise<string> {
-	const encodedHeader = jwtPart(JSON.stringify({ alg: "RS256", kid: "test-key", typ: "JWT" }));
-	const encodedPayload = jwtPart(JSON.stringify(payload));
-	const signingInput = `${encodedHeader}.${encodedPayload}`;
-	const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", privateKey, new TextEncoder().encode(signingInput));
-	return `${signingInput}.${jwtPart(signature)}`;
-}
-
-function jwtPart(value: string | ArrayBuffer): string {
-	const bytes = typeof value === "string" ? new TextEncoder().encode(value) : new Uint8Array(value);
-	return base64UrlBytes(bytes);
+function internalRequest(path: string, admin: InternalAdminFixture, init: RequestInit = {}): Request {
+	const headers = new Headers(init.headers);
+	headers.set("Authorization", `Bearer ${admin.token}`);
+	return new Request(`${BASE_URL}${path}`, { ...init, headers });
 }

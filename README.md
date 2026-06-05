@@ -2,7 +2,7 @@
 
 Turboflare is a speed-first, Cloudflare-native remote cache for Turborepo.
 
-It is designed to be compatible with Turborepo's `/v8/artifacts` remote cache protocol while using Cloudflare Workers, R2, Cache API, Analytics Engine, Rate Limiting, Access, and optional KV artifact storage.
+It is designed to be compatible with Turborepo's `/v8/artifacts` remote cache protocol while using Cloudflare Workers, R2, Cache API, Analytics Engine, Rate Limiting, D1, and optional KV artifact storage.
 
 ## Goal
 
@@ -45,10 +45,10 @@ Current implementation details:
 - Optional Rate Limiting binding enforcement keys limits by team and token.
 - Optional D1 artifact indexing records upload metadata for larger installations.
 - Scheduled cleanup can remove expired artifacts under the versioned key prefix.
-- `/internal/*` routes are separated from Turbo bearer auth and protected by Cloudflare Access JWT verification.
+- `/internal/*` routes are separated from Turbo bearer auth and protected by a dedicated internal admin token.
 - Lightweight `/v2/user`, `/v2/teams`, and `/v2/teams/:id` compatibility routes support Turbo user/team discovery with existing bearer tokens.
 
-For multi-tenant deployments, prefer scoped static tokens or D1-backed hashed tokens over global static tokens. `/internal/*` administration is protected separately with Cloudflare Access JWT verification.
+For multi-tenant deployments, prefer scoped static tokens or D1-backed hashed tokens over global static tokens. `/internal/*` administration is protected separately with `INTERNAL_ADMIN_TOKEN`.
 
 ## Development
 
@@ -123,13 +123,13 @@ For hashed D1-backed tokens, bind `TOKEN_DB` and apply `apps/cache-worker/schema
 
 For optional artifact indexing, bind `ARTIFACT_INDEX` and apply `apps/cache-worker/schema/002_artifact_index.sql`. Index writes run after R2 upload via `ctx.waitUntil()` and are not required for cache correctness.
 
-Access-protected token admin routes are available when `TOKEN_DB` is bound:
+Internal token admin routes are available when `TOKEN_DB` is bound:
 
 - `GET /internal/tokens` lists token metadata without hashes.
 - `POST /internal/tokens` creates a token from `{ "teams": ["team_turboflare"], "scopes": ["read", "write"] }` and returns the raw token once.
 - `POST /internal/tokens/:id/revoke` marks a token revoked without deleting its audit row.
 
-Access-protected artifact admin routes are also available:
+Internal artifact admin routes are also available:
 
 - `POST /internal/artifacts/purge-expired` runs the same bounded retention cleanup as the scheduled Worker.
 
@@ -146,11 +146,7 @@ Optional Worker variables and bindings:
 - `ARTIFACTS_KV` is required only when `ARTIFACT_STORE=kv`.
 - `ANALYTICS` can be bound to Analytics Engine for non-blocking request metrics.
 - `RATE_LIMITER` can be bound to Cloudflare Workers Rate Limiting. It is enforced after auth with keys shaped as `team:{teamKey}:token:{tokenId}`.
-- `INTERNAL_ACCESS_BYPASS=true` allows `/internal/*` routes in local tests only. Do not use it for public deployments.
-- `INTERNAL_ACCESS_TEAM_DOMAIN` is your Access team domain, for example `https://example.cloudflareaccess.com`.
-- `INTERNAL_ACCESS_AUD` is the Access application audience tag. Comma-separated values are accepted.
-- `INTERNAL_ACCESS_JWKS_URL` optionally overrides the Access certs URL.
-- `INTERNAL_ACCESS_JWKS` optionally provides the Access JWKS JSON directly for tests or offline deployments.
+- `INTERNAL_ADMIN_TOKEN` protects `/internal/*` and is separate from `TURBO_TOKEN`.
 - `RETENTION_DAYS` controls scheduled R2 artifact cleanup. The default is `30`.
 - `CLEANUP_MAX_DELETE` caps scheduled deletions per run. The default is `1000`.
 
@@ -175,6 +171,7 @@ Set secrets out of band:
 
 ```sh
 wrangler secret put TURBO_TOKEN --config apps/cache-worker/wrangler.jsonc
+wrangler secret put INTERNAL_ADMIN_TOKEN --config apps/cache-worker/wrangler.jsonc
 ```
 
 Turbo client environment:
@@ -186,4 +183,4 @@ export TURBO_TEAM="team-name"
 turbo run build
 ```
 
-Expose `/v8/*` publicly behind bearer auth. Keep `/internal/*` behind Cloudflare Access with `INTERNAL_ACCESS_TEAM_DOMAIN` and `INTERNAL_ACCESS_AUD` configured.
+Expose `/v8/*` publicly behind Turbo bearer auth. Keep `/internal/*` private and set a separate `INTERNAL_ADMIN_TOKEN`; internal routes fail closed when it is missing.
