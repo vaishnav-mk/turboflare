@@ -1,7 +1,7 @@
 import { type ArtifactLookupRequest, HttpMethod } from "@turboflare/protocol";
-import { errorResponse, methodNotAllowed } from "@turboflare/shared";
 
 import type { Env } from "../../app/env";
+import { errorResponse, methodNotAllowed } from "../../http/response";
 import { artifactStoreUnavailable } from "../../storage/artifacts";
 import { lookupArtifacts } from "../../storage/lookup";
 import type { TenantContext } from "../../tenancy/types";

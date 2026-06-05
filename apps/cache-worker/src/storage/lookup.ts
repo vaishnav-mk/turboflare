@@ -1,7 +1,7 @@
 import type { ArtifactLookupResponse } from "@turboflare/protocol";
-import { errorResponse, jsonResponse } from "@turboflare/shared";
 
 import type { Env } from "../app/env";
+import { errorResponse, jsonResponse } from "../http/response";
 import { mapWithConcurrency } from "../shared/concurrency";
 import type { TenantContext } from "../tenancy/types";
 import { BATCH_HEAD_CONCURRENCY, MAX_BATCH_HASHES } from "./constants";

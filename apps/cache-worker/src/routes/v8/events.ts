@@ -1,7 +1,7 @@
 import { HttpMethod } from "@turboflare/protocol";
-import { errorResponse, jsonResponse, methodNotAllowed } from "@turboflare/shared";
 
 import type { Env } from "../../app/env";
+import { errorResponse, jsonResponse, methodNotAllowed } from "../../http/response";
 import { recordMetric } from "../../observability/metrics";
 import { MetricEvent } from "../../observability/types";
 

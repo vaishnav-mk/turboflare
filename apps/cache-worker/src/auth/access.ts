@@ -1,6 +1,5 @@
-import { errorResponse } from "@turboflare/shared";
-
 import { appConfig, type Env } from "../app/env";
+import { errorResponse } from "../http/response";
 
 interface AccessJwtHeader {
 	alg?: unknown;

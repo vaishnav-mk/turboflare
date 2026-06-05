@@ -1,7 +1,7 @@
 import type { Env } from "../app/env";
 import { deleteStoredArtifacts } from "./artifacts";
 import { ARTIFACT_NAMESPACE_VERSION } from "./constants";
-import { deleteIndexedArtifacts } from "./index";
+import { deleteIndexedArtifacts } from "./artifact-index";
 import { listStoredArtifacts } from "./list";
 
 export interface TeamStats {

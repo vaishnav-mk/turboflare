@@ -1,15 +1,15 @@
 import { ARTIFACT_EVENTS_PATH, ARTIFACT_STATUS_PATH, ARTIFACTS_PATH, HttpMethod, TURBO_API_PREFIX } from "@turboflare/protocol";
-import { errorResponse } from "@turboflare/shared";
 
 import type { Env } from "./env";
 import { authenticateBearer, canAccessTenant, hasScope } from "../auth/bearer";
 import { AuthScope } from "../auth/types";
+import { errorResponse } from "../http/response";
 import { recordMetric } from "../observability/metrics";
 import { MetricEvent } from "../observability/types";
 import { enforceRateLimit } from "../rate-limit/enforce";
 import { handleVercelCompatibility } from "../routes/compat/vercel";
-import { handleHealth } from "../routes/internal/health";
 import { handleInternal } from "../routes/internal/router";
+import { handleManagementHealth } from "../routes/management/health";
 import { handleArtifact } from "../routes/v8/artifacts";
 import { handleArtifactLookup } from "../routes/v8/batch";
 import { handleEvents } from "../routes/v8/events";
@@ -31,7 +31,7 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
 		});
 	}
 
-	const health = handleHealth(request);
+	const health = handleManagementHealth(request);
 	if (health !== null) {
 		return health;
 	}

@@ -12,8 +12,7 @@
 		"typecheck": "tsc -p tsconfig.json --noEmit"
 	},
 	"dependencies": {
-		"@turboflare/protocol": "workspace:*",
-		"@turboflare/shared": "workspace:*"
+		"@turboflare/protocol": "workspace:*"
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.15.0",

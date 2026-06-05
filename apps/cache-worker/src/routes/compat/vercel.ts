@@ -1,9 +1,8 @@
-import { errorResponse, jsonResponse, methodNotAllowed } from "@turboflare/shared";
-
 import type { Env } from "../../app/env";
 import { ALL_TEAMS } from "../../auth/constants";
 import { authenticateBearer } from "../../auth/bearer";
 import type { AuthContext } from "../../auth/types";
+import { errorResponse, jsonResponse, methodNotAllowed } from "../../http/response";
 
 interface CompatTeam {
 	created: string;

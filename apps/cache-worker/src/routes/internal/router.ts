@@ -1,7 +1,6 @@
-import { errorResponse, methodNotAllowed } from "@turboflare/shared";
-
 import type { Env } from "../../app/env";
 import { requireAccess } from "../../auth/access";
+import { errorResponse, methodNotAllowed } from "../../http/response";
 import { handleInternalArtifacts } from "./artifacts";
 import { handleInternalHealth } from "./health";
 import { handleInternalTeam } from "./team";

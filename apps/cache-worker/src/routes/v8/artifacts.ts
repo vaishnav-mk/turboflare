@@ -1,13 +1,13 @@
 import { HttpMethod } from "@turboflare/protocol";
-import { errorResponse, jsonResponse, methodNotAllowed } from "@turboflare/shared";
 
 import { appConfig, type Env } from "../../app/env";
 import type { AuthContext } from "../../auth/types";
+import { errorResponse, jsonResponse, methodNotAllowed } from "../../http/response";
 import { recordMetric } from "../../observability/metrics";
 import { MetricEvent } from "../../observability/types";
 import { artifactStoreUnavailable, getArtifactObject, headArtifactObject, kvUploadLimitError, putArtifactObject } from "../../storage/artifacts";
 import { artifactCache, cacheableResponse, cacheRequest } from "../../storage/cache-api";
-import { indexArtifact } from "../../storage/index";
+import { indexArtifact } from "../../storage/artifact-index";
 import { artifactKey } from "../../storage/keys";
 import { artifactCustomMetadata, artifactResponseHeaders } from "../../storage/metadata";
 import type { TenantContext } from "../../tenancy/types";

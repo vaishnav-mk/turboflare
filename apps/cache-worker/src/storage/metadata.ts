@@ -1,7 +1,7 @@
 import { ArtifactHeader, type ArtifactLookupHit } from "@turboflare/protocol";
-import { errorResponse } from "@turboflare/shared";
 
 import type { AuthContext } from "../auth/types";
+import { errorResponse } from "../http/response";
 import { recordUtf8ByteLength } from "../shared/bytes";
 import { parseDurationMs } from "../shared/duration";
 import type { TenantContext } from "../tenancy/types";

@@ -1,7 +1,6 @@
-import { errorResponse } from "@turboflare/shared";
-
 import type { Env } from "../app/env";
 import type { AuthContext } from "../auth/types";
+import { errorResponse } from "../http/response";
 import type { TenantContext } from "../tenancy/types";
 
 export async function enforceRateLimit(env: Env, authContext: AuthContext, tenant: TenantContext | null): Promise<Response | null> {

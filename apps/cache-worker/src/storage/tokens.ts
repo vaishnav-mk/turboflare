@@ -1,9 +1,9 @@
 import type { Env } from "../app/env";
 import { MAX_BEARER_TOKEN_LENGTH } from "../auth/constants";
 import { hashToken } from "../auth/d1";
+import { parseAuthScopes, parseAuthScopesJson, parseTeamKeys, parseTeamKeysJson } from "../auth/token-fields";
 import { AuthScope } from "../auth/types";
 import { base64UrlBytes } from "../shared/base64";
-import { parseJsonArray, unique } from "../shared/json";
 
 export interface TokenRecord {
 	expiresAt: string | null;
@@ -108,7 +108,7 @@ function parseCreateToken(input: CreateTokenInput): Omit<CreatedToken, "revokedA
 	}
 
 	if (scopes.length === 0) {
-		return "scopes must include read, write, or admin";
+		return "scopes must include read or write";
 	}
 
 	if (expiresAt === false) {
@@ -123,8 +123,8 @@ function tokenRecord(row: TokenRow): TokenRecord {
 		expiresAt: row.expires_at ?? null,
 		id: row.id,
 		revokedAt: row.revoked_at ?? null,
-		scopes: parseJsonArray(row.scopes).flatMap((scope) => (isAuthScope(scope) ? [scope] : [])),
-		teams: parseJsonArray(row.teams).flatMap((team) => (typeof team === "string" ? [team] : [])),
+		scopes: parseAuthScopesJson(row.scopes),
+		teams: parseTeamKeysJson(row.teams),
 	};
 }
 
@@ -137,11 +137,11 @@ function parseRawToken(value: unknown): string | null {
 }
 
 function parseTeams(value: unknown): readonly string[] {
-	return Array.isArray(value) ? unique(value.filter((team): team is string => typeof team === "string" && team.length > 0)) : [];
+	return parseTeamKeys(value);
 }
 
 function parseScopes(value: unknown): readonly AuthScope[] {
-	return Array.isArray(value) ? unique(value.flatMap((scope) => (isAuthScope(scope) ? [scope] : []))) : [];
+	return parseAuthScopes(value);
 }
 
 function parseExpiresAt(value: unknown): string | null | false {
@@ -155,10 +155,6 @@ function parseExpiresAt(value: unknown): string | null | false {
 
 	const time = Date.parse(value);
 	return Number.isFinite(time) ? new Date(time).toISOString() : false;
-}
-
-function isAuthScope(value: unknown): value is AuthScope {
-	return value === AuthScope.Admin || value === AuthScope.Read || value === AuthScope.Write;
 }
 
 function generatedToken(): string {

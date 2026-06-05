@@ -1,6 +1,5 @@
-import { errorResponse, jsonResponse, methodNotAllowed } from "@turboflare/shared";
-
 import type { Env } from "../../app/env";
+import { errorResponse, jsonResponse, methodNotAllowed } from "../../http/response";
 import { purgeTeam, teamStats } from "../../storage/admin";
 
 const TEAM_ROUTE = /^\/internal\/teams\/([^/]+)\/(stats|purge-all)$/;

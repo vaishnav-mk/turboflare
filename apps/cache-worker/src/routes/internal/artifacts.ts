@@ -1,6 +1,5 @@
-import { jsonResponse, methodNotAllowed } from "@turboflare/shared";
-
 import type { Env } from "../../app/env";
+import { jsonResponse, methodNotAllowed } from "../../http/response";
 import { cleanupExpiredArtifacts } from "../../storage/cleanup";
 
 const PURGE_EXPIRED_PATH = "/internal/artifacts/purge-expired";

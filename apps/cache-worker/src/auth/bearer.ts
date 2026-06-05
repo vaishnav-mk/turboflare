@@ -1,7 +1,6 @@
-import { readBearerToken, timingSafeEqual } from "@turboflare/shared";
-
 import type { Env } from "../app/env";
 import type { TenantContext } from "../tenancy/types";
+import { readBearerToken, timingSafeEqual } from "./bearer-token";
 import { ALL_TEAMS, MAX_BEARER_TOKEN_LENGTH } from "./constants";
 import { authenticateD1Token } from "./d1";
 import { parseAllowedTokens, parseScopedTokens } from "./static";

@@ -1,6 +1,5 @@
-import { errorResponse, jsonResponse, methodNotAllowed } from "@turboflare/shared";
-
 import type { Env } from "../../app/env";
+import { errorResponse, jsonResponse, methodNotAllowed } from "../../http/response";
 import { createToken, listTokens, revokeToken } from "../../storage/tokens";
 
 const TOKEN_ROUTE = /^\/internal\/tokens(?:\/([^/]+)\/revoke)?$/;

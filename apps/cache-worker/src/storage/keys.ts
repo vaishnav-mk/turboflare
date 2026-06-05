@@ -1,5 +1,4 @@
-import { errorResponse } from "@turboflare/shared";
-
+import { errorResponse } from "../http/response";
 import { utf8ByteLength } from "../shared/bytes";
 import type { TenantContext } from "../tenancy/types";
 import { ARTIFACT_NAMESPACE_VERSION, MAX_R2_KEY_BYTES } from "./constants";

@@ -1,7 +1,7 @@
 import type { Env } from "../app/env";
 import { sha256Hex } from "../shared/hash";
-import { parseJsonArray } from "../shared/json";
-import { AuthScope, type AuthContext } from "./types";
+import { parseAuthScopesJson, parseTeamKeysJson } from "./token-fields";
+import type { AuthContext } from "./types";
 
 interface TokenRow {
 	expires_at?: string | null;
@@ -24,8 +24,8 @@ export async function authenticateD1Token(env: Env, token: string, now = Date.no
 		return null;
 	}
 
-	const scopes = parseScopes(row.scopes);
-	const allowedTeams = parseTeams(row.teams);
+	const scopes = parseAuthScopesJson(row.scopes);
+	const allowedTeams = parseTeamKeysJson(row.teams);
 	if (scopes.length === 0 || allowedTeams.length === 0) {
 		return null;
 	}
@@ -35,15 +35,6 @@ export async function authenticateD1Token(env: Env, token: string, now = Date.no
 
 export async function hashToken(token: string): Promise<string> {
 	return sha256Hex(token);
-}
-
-function parseScopes(value: string): readonly AuthScope[] {
-	return parseJsonArray(value).flatMap((scope) => (scope === AuthScope.Admin || scope === AuthScope.Read || scope === AuthScope.Write ? [scope] : []));
-}
-
-function parseTeams(value: string): readonly string[] {
-	const teams = parseJsonArray(value).filter((team): team is string => typeof team === "string" && team.length > 0);
-	return teams;
 }
 
 function isExpired(value: string | null | undefined, now: number): boolean {

@@ -1,8 +1,8 @@
 import type { CacheStatusResponse } from "@turboflare/protocol";
 import { HttpMethod } from "@turboflare/protocol";
-import { jsonResponse, methodNotAllowed } from "@turboflare/shared";
 
 import { appConfig, type Env } from "../../app/env";
+import { jsonResponse, methodNotAllowed } from "../../http/response";
 import { recordMetric } from "../../observability/metrics";
 import { MetricEvent } from "../../observability/types";
 

@@ -1,6 +1,6 @@
 import { AuthScope, type StaticTokenRule } from "./types";
 import { ALL_TEAMS, MAX_BEARER_TOKEN_LENGTH } from "./constants";
-import { unique } from "../shared/json";
+import { parseAuthScopes, parseTeamKeys } from "./token-fields";
 
 export function parseAllowedTokens(rawTokens: string | undefined): readonly StaticTokenRule[] {
 	if (rawTokens === undefined) {
@@ -51,8 +51,8 @@ function parseScopedTokenRule(value: unknown, index: number): StaticTokenRule | 
 		return null;
 	}
 
-	const scopes = parseScopes(raw.scopes);
-	const teams = parseTeams(raw.teams);
+	const scopes = parseAuthScopes(raw.scopes);
+	const teams = parseTeamKeys(raw.teams);
 	if (scopes.length === 0 || teams.length === 0) {
 		return null;
 	}
@@ -63,24 +63,4 @@ function parseScopedTokenRule(value: unknown, index: number): StaticTokenRule | 
 		teams,
 		token: raw.token,
 	};
-}
-
-function parseScopes(value: unknown): readonly AuthScope[] {
-	if (!Array.isArray(value)) {
-		return [];
-	}
-
-	return unique(value.flatMap((scope) => (isAuthScope(scope) ? [scope] : [])));
-}
-
-function parseTeams(value: unknown): readonly string[] {
-	if (!Array.isArray(value)) {
-		return [];
-	}
-
-	return unique(value.filter((team): team is string => typeof team === "string" && team.length > 0));
-}
-
-function isAuthScope(value: unknown): value is AuthScope {
-	return value === AuthScope.Admin || value === AuthScope.Read || value === AuthScope.Write;
 }

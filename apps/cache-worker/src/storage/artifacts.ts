@@ -1,6 +1,5 @@
-import { errorResponse } from "@turboflare/shared";
-
 import { appConfig, ArtifactStore, type Env } from "../app/env";
+import { errorResponse } from "../http/response";
 import { MAX_KV_VALUE_BYTES } from "./constants";
 import { deleteKvArtifacts, getKvArtifact, headKvArtifact, putKvArtifact } from "./kv";
 import type { ArtifactBodyObject, ArtifactMetadataObject } from "./metadata";
