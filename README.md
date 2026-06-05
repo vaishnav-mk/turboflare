@@ -2,15 +2,15 @@
 
 Turboflare is a speed-first, Cloudflare-native remote cache for Turborepo.
 
-It is designed to be compatible with Turborepo's `/v8/artifacts` remote cache protocol while using Cloudflare Workers, R2, Cache API, Durable Objects, Analytics Engine, Rate Limiting, Access, and optionally Cloudflare Artifacts.
+It is designed to be compatible with Turborepo's `/v8/artifacts` remote cache protocol while using Cloudflare Workers, R2, Cache API, Analytics Engine, Rate Limiting, Access, and optional KV artifact storage.
 
 ## Goal
 
 Be the best self-hostable Turborepo remote cache for teams that want Cloudflare-native performance, control, observability, and enterprise operations.
 
-## Current Status
+## Implemented Features
 
-Initial Worker implementation exists. The current app provides the basic Turborepo `/v8/artifacts` protocol on Workers and R2 by default:
+Turboflare implements the Turborepo `/v8/artifacts` remote cache protocol on Workers with R2 as the default artifact store:
 
 - `GET /v8/artifacts/status`
 - `PUT /v8/artifacts/:artifactId`
@@ -40,19 +40,17 @@ Current implementation details:
 - Optional Analytics Engine metrics are emitted without blocking cache requests.
 - Optional Rate Limiting binding enforcement keys limits by team and token.
 - Optional D1 artifact indexing records upload metadata for larger installations.
-- Scheduled R2 cleanup can remove expired artifacts under the versioned key prefix.
+- Scheduled cleanup can remove expired artifacts under the versioned key prefix.
 - `/internal/*` routes are separated from Turbo bearer auth and protected by Cloudflare Access JWT verification.
 - Lightweight `/v2/user`, `/v2/teams`, and `/v2/teams/:id` compatibility routes support Turbo user/team discovery with existing bearer tokens.
-
-Local research and planning docs live under `docs/` and are intentionally ignored until they are ready to publish.
 
 ## Reference Findings
 
 The current baseline was shaped by three deeper references:
 
-- `brunojppb/turbo-cache-server`: copy the tiny stateless streaming model, public health endpoint, and boring S3/R2-style hot path.
-- `ducktors/turborepo-remote-cache`: copy `teamId`/`team`/`slug` compatibility, read-only mode, and future JWT/JWKS ideas; avoid buffered uploads and separate `.tag` objects.
-- `Tapico/tapico-turborepo-remote-cache`: copy comma-separated token rotation; avoid bucket-per-team, per-request storage setup, and secret logging.
+- `brunojppb/turbo-cache-server`: validated a tiny stateless streaming model, public health endpoint, and S3/R2-style hot path.
+- `ducktors/turborepo-remote-cache`: informed `teamId`/`team`/`slug` compatibility, read-only mode, and future JWT/JWKS considerations.
+- `Tapico/tapico-turborepo-remote-cache`: informed comma-separated token rotation and reinforced avoiding bucket-per-team, per-request storage setup, and secret logging.
 
 For multi-tenant deployments, prefer scoped static tokens or D1-backed hashed tokens over global static tokens. `/internal/*` administration is protected separately with Cloudflare Access JWT verification.
 

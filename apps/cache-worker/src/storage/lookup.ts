@@ -14,15 +14,19 @@ export async function lookupArtifacts(env: Env, tenant: TenantContext, artifactI
 		return errorResponse(400, "bad_request", `Artifact lookup supports at most ${MAX_BATCH_HASHES} hashes`);
 	}
 
-	const entries = await mapWithConcurrency(artifactIds, BATCH_HEAD_CONCURRENCY, async (artifactId) => {
-		const key = artifactKey(tenant, artifactId);
-		if (key instanceof Response) {
-			return [artifactId, null] as const;
-		}
+	const entries = await mapWithConcurrency(
+		artifactIds,
+		BATCH_HEAD_CONCURRENCY,
+		async (artifactId) => {
+			const key = artifactKey(tenant, artifactId);
+			if (key instanceof Response) {
+				return [artifactId, null] as const;
+			}
 
-		const object = await headArtifactObject(env, key);
-		return [artifactId, object === null ? null : lookupHit(object)] as const;
-	});
+			const object = await headArtifactObject(env, key);
+			return [artifactId, object === null ? null : lookupHit(object)] as const;
+		}
+	);
 
 	return jsonResponse(Object.fromEntries(entries) as ArtifactLookupResponse);
 }
