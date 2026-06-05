@@ -101,6 +101,15 @@ R2 is the default and recommended artifact store. It supports the streaming hot 
 }
 ```
 
+Configure R2 lifecycle rules for the same versioned prefix used by Turboflare:
+
+```sh
+pnpm r2:lifecycle:dry-run
+CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=... pnpm r2:lifecycle
+```
+
+The lifecycle setup deletes objects under `v1/` after `RETENTION_DAYS` and aborts stale multipart uploads after `ABORT_MULTIPART_DAYS` days. `RETENTION_DAYS` defaults to the Worker value in `apps/cache-worker/wrangler.jsonc`; `ABORT_MULTIPART_DAYS` defaults to `1`.
+
 KV artifact storage is optional for deployments that need it. Enable it explicitly:
 
 ```jsonc
@@ -149,6 +158,7 @@ Optional Worker variables and bindings:
 - `INTERNAL_ADMIN_TOKEN` protects `/internal/*` and is separate from `TURBO_TOKEN`.
 - `RETENTION_DAYS` controls scheduled R2 artifact cleanup. The default is `30`.
 - `CLEANUP_MAX_DELETE` caps scheduled deletions per run. The default is `1000`.
+- `ABORT_MULTIPART_DAYS` controls the R2 lifecycle rule for stale multipart uploads when running `pnpm r2:lifecycle`. The default is `1`.
 
 Use R2 `Standard` storage for cache artifacts. Turborepo cache artifacts are usually hot and short-lived, so Infrequent Access is not the default.
 
@@ -165,6 +175,12 @@ Apply optional D1 schema files only for the features you bind:
 ```sh
 wrangler d1 execute <token-db-name> --file apps/cache-worker/schema/001_tokens.sql
 wrangler d1 execute <artifact-index-db-name> --file apps/cache-worker/schema/002_artifact_index.sql
+```
+
+Apply R2 lifecycle rules after creating the bucket:
+
+```sh
+CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=... pnpm r2:lifecycle
 ```
 
 Set secrets out of band:
