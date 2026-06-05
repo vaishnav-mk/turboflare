@@ -1,5 +1,6 @@
 {
 	"$schema": "https://turbo.build/schema.json",
+	"globalDependencies": ["fixtures/complex-turbo-monorepo/**", "scripts/fixtures/**"],
 	"tasks": {
 		"build": {
 			"dependsOn": ["^build"],

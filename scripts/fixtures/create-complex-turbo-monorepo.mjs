@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -12,7 +12,6 @@ mkdirSync(join(fixture, "apps"), { recursive: true });
 mkdirSync(join(fixture, "packages"), { recursive: true });
 
 run("pnpm", ["dlx", "create-next-app@latest", `${fixturePath}/apps/web`, "--ts", "--app", "--src-dir", "--eslint", "--use-pnpm", "--skip-install", "--yes", "--disable-git"]);
-writeBuildApprovalWorkspace(join(fixture, "apps", "web", "pnpm-workspace.yaml"));
 run("pnpm", ["dlx", "create-vite@latest", `${fixturePath}/apps/dashboard`, "--template", "react-ts", "--no-interactive", "--overwrite"]);
 run("pnpm", ["dlx", "create-astro@latest", `${fixturePath}/apps/docs`, "--template", "minimal", "--no-install", "--no-git", "--yes", "--skip-houston"]);
 run("pnpm", ["create", "hono@latest", `${fixturePath}/apps/api`, "--template", "cloudflare-workers", "--pm", "pnpm", "--install"]);
@@ -25,9 +24,6 @@ writeJson(join(fixture, "package.json"), {
 	packageManager: "pnpm@11.5.0",
 	scripts: {
 		build: "turbo run build",
-	},
-	devDependencies: {
-		turbo: "^2.9.16",
 	},
 });
 
@@ -76,8 +72,6 @@ patchPackage(join(fixture, "apps", "api", "package.json"), (pkg) => {
 	pkg.dependencies = { ...pkg.dependencies, "@fixture/math": "workspace:*" };
 });
 
-copyIfExists(join(root, "pnpm-workspace.yaml"), join(fixture, ".source-pnpm-workspace.yaml"));
-
 run("pnpm", ["install", "--lockfile-only"], { cwd: fixture });
 
 function run(command, args, options = {}) {
@@ -95,16 +89,6 @@ function patchPackage(path, patch) {
 	const pkg = JSON.parse(readFileSync(path, "utf8"));
 	patch(pkg);
 	writeJson(path, pkg);
-}
-
-function copyIfExists(source, destination) {
-	if (existsSync(source)) {
-		cpSync(source, destination);
-	}
-}
-
-function writeBuildApprovalWorkspace(path) {
-	writeFileSync(path, `${buildApprovals()}\n`);
 }
 
 function buildApprovals() {
