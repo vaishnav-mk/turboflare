@@ -2,7 +2,8 @@ import { type ArtifactLookupRequest, HttpMethod } from "@turboflare/protocol";
 import { errorResponse, methodNotAllowed } from "@turboflare/shared";
 
 import type { Env } from "../../app/env";
-import { artifactStoreUnavailable, lookupArtifacts } from "../../storage/artifacts";
+import { artifactStoreUnavailable } from "../../storage/artifacts";
+import { lookupArtifacts } from "../../storage/lookup";
 import type { TenantContext } from "../../tenancy/types";
 
 export async function handleArtifactLookup(request: Request, env: Env, tenant: TenantContext): Promise<Response> {

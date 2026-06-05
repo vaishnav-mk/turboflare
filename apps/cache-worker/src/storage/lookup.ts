@@ -1,0 +1,28 @@
+import type { ArtifactLookupResponse } from "@turboflare/protocol";
+import { errorResponse, jsonResponse } from "@turboflare/shared";
+
+import type { Env } from "../app/env";
+import { mapWithConcurrency } from "../shared/concurrency";
+import type { TenantContext } from "../tenancy/types";
+import { BATCH_HEAD_CONCURRENCY, MAX_BATCH_HASHES } from "./constants";
+import { headArtifactObject } from "./artifacts";
+import { artifactKey } from "./keys";
+import { lookupHit } from "./metadata";
+
+export async function lookupArtifacts(env: Env, tenant: TenantContext, artifactIds: readonly string[]): Promise<Response> {
+	if (artifactIds.length > MAX_BATCH_HASHES) {
+		return errorResponse(400, "bad_request", `Artifact lookup supports at most ${MAX_BATCH_HASHES} hashes`);
+	}
+
+	const entries = await mapWithConcurrency(artifactIds, BATCH_HEAD_CONCURRENCY, async (artifactId) => {
+		const key = artifactKey(tenant, artifactId);
+		if (key instanceof Response) {
+			return [artifactId, null] as const;
+		}
+
+		const object = await headArtifactObject(env, key);
+		return [artifactId, object === null ? null : lookupHit(object)] as const;
+	});
+
+	return jsonResponse(Object.fromEntries(entries) as ArtifactLookupResponse);
+}
