@@ -42,6 +42,19 @@ describe("cleanupExpiredArtifacts", () => {
 		expect(await cleanupExpiredArtifacts({ ARTIFACTS: bucket as unknown as R2Bucket, CLEANUP_MAX_DELETE: "0" } satisfies Env, Date.now())).toEqual({ deleted: 0, scanned: 0 });
 		expect(bucket.deleted).toEqual([]);
 	});
+
+	it("supports shorter branch retention", async ({ expect }) => {
+		const bucket = new CleanupBucket([
+			{ key: "v1/team/a/artifact/main", uploaded: daysAgo(10) },
+			{ key: "v1/team/a/branch/pr-1/artifact/old", uploaded: daysAgo(10) },
+			{ key: "v1/team/a/branch/pr-1/artifact/new", uploaded: daysAgo(1) },
+		]);
+
+		const result = await cleanupExpiredArtifacts({ ARTIFACTS: bucket as unknown as R2Bucket, BRANCH_RETENTION_DAYS: "7", RETENTION_DAYS: "30" } satisfies Env, Date.now());
+
+		expect(result).toEqual({ deleted: 1, scanned: 3 });
+		expect(bucket.deleted).toEqual(["v1/team/a/branch/pr-1/artifact/old"]);
+	});
 });
 
 class CleanupBucket {

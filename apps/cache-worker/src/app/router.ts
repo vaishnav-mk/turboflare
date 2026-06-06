@@ -77,7 +77,7 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
 		return withProtocolHeaders(handleStatus(request, env, ctx));
 	}
 
-	const tenant = resolveTenant(url);
+	const tenant = resolveTenant(request, env);
 	if (!canAccessTenant(authContext, tenant)) {
 		return withProtocolHeaders(errorResponse(403, "forbidden", "Token cannot access this team"));
 	}

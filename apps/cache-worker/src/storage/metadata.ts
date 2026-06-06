@@ -50,6 +50,8 @@ export function artifactCustomMetadata(
 	setMetadata(metadata, "dirtyHash", request.headers.get(ArtifactHeader.DirtyHash));
 	setMetadata(metadata, "clientCi", request.headers.get(ArtifactHeader.ClientCi));
 	setMetadata(metadata, "clientInteractive", request.headers.get(ArtifactHeader.ClientInteractive));
+	setMetadata(metadata, "branch", tenant.branch ?? null);
+	setMetadata(metadata, "fallbackBranch", tenant.fallbackBranch ?? null);
 
 	if (recordUtf8ByteLength(metadata) > MAX_CUSTOM_METADATA_BYTES) {
 		return errorResponse(400, "bad_request", "Artifact metadata is too large");

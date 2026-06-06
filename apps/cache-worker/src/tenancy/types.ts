@@ -6,6 +6,9 @@ export enum TenantSource {
 }
 
 export interface TenantContext {
+	branch?: string;
+	fallbackBranch?: string;
 	key: string;
+	readOnly: boolean;
 	source: TenantSource;
 }

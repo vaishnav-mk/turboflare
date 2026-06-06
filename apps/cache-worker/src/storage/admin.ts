@@ -1,7 +1,7 @@
 import type { Env } from "../app/env";
 import { deleteStoredArtifacts } from "./artifacts";
-import { ARTIFACT_NAMESPACE_VERSION } from "./constants";
 import { deleteIndexedArtifacts } from "./artifact-index";
+import { teamKeyPrefix } from "./keys";
 import { listStoredArtifacts } from "./list";
 
 export interface TeamStats {
@@ -56,5 +56,5 @@ export async function purgeTeam(env: Env, team: string, maxDelete = PAGE_LIMIT):
 }
 
 function teamPrefix(team: string): string {
-	return `${ARTIFACT_NAMESPACE_VERSION}/team/${encodeURIComponent(team)}/artifact/`;
+	return teamKeyPrefix(team);
 }

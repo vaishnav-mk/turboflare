@@ -80,17 +80,19 @@ describe("cache worker", () => {
 		const admin = internalAdmin({ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, TURBO_TOKEN: TOKEN } satisfies Env);
 		await admin.env.ARTIFACTS.put(`v1/team/${TEAM_ID}/artifact/one`, new Uint8Array([1, 2]));
 		await admin.env.ARTIFACTS.put(`v1/team/${TEAM_ID}/artifact/two`, new Uint8Array([3]));
+		await admin.env.ARTIFACTS.put(`v1/team/${TEAM_ID}/branch/pr-1/artifact/branch`, new Uint8Array([5]));
 		await admin.env.ARTIFACTS.put(`v1/team/${OTHER_TEAM_ID}/artifact/three`, new Uint8Array([4]));
 
 		const stats = await handleRequest(internalRequest(`/internal/teams/${TEAM_ID}/stats`, admin), admin.env, createExecutionContext());
 		expect(stats.status).toBe(200);
-		expect(await stats.json()).toEqual({ bytes: 3, objects: 2, team: TEAM_ID });
+		expect(await stats.json()).toEqual({ bytes: 4, objects: 3, team: TEAM_ID });
 
 		const purge = await handleRequest(internalRequest(`/internal/teams/${TEAM_ID}/purge-all`, admin, { method: "POST" }), admin.env, createExecutionContext());
 		expect(purge.status).toBe(200);
-		expect(await purge.json()).toEqual({ deleted: 2, team: TEAM_ID });
+		expect(await purge.json()).toEqual({ deleted: 3, team: TEAM_ID });
 
 		expect(await admin.env.ARTIFACTS.head(`v1/team/${TEAM_ID}/artifact/one`)).toBeNull();
+		expect(await admin.env.ARTIFACTS.head(`v1/team/${TEAM_ID}/branch/pr-1/artifact/branch`)).toBeNull();
 		expect(await admin.env.ARTIFACTS.head(`v1/team/${OTHER_TEAM_ID}/artifact/three`)).not.toBeNull();
 	});
 
@@ -386,6 +388,92 @@ describe("cache worker", () => {
 		expect(head.status).toBe(200);
 		expect(head.headers.get("content-length")).toBe(body.byteLength.toString());
 		expect(head.headers.get("x-artifact-duration")).toBe("1234");
+	});
+
+	it("requires signed artifact metadata when signature policy is require", async ({ expect }) => {
+		const unsigned = await handleRequest(
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${randomArtifactId()}?teamId=${TEAM_ID}`, {
+				body: new Uint8Array([1]),
+				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/octet-stream" },
+				method: "PUT",
+			}),
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, SIGNATURE_POLICY: "require", TURBO_TOKEN: TOKEN },
+			createExecutionContext()
+		);
+		expect(unsigned.status).toBe(400);
+		expect(await unsigned.json()).toEqual({ error: { code: "signature_required", message: "Signed artifact metadata is required" } });
+
+		const signed = await handleRequest(
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${randomArtifactId()}?teamId=${TEAM_ID}`, {
+				body: new Uint8Array([1]),
+				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/octet-stream", "x-artifact-sha": "sha-value" },
+				method: "PUT",
+			}),
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, SIGNATURE_POLICY: "require", TURBO_TOKEN: TOKEN },
+			createExecutionContext()
+		);
+		expect(signed.status).toBe(200);
+	});
+
+	it("isolates branch artifacts when branch cache policy is isolated", async ({ expect }) => {
+		const artifactId = randomArtifactId();
+		const env = { ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, BRANCH_CACHE_POLICY: "isolated", TURBO_TOKEN: TOKEN } satisfies Env;
+
+		const put = await handleRequest(
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}&branch=feature/a`, {
+				body: new Uint8Array([1]),
+				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/octet-stream" },
+				method: "PUT",
+			}),
+			env,
+			createExecutionContext()
+		);
+		expect(put.status).toBe(200);
+		expect(await env.ARTIFACTS.head(`v1/team/${TEAM_ID}/branch/feature%2Fa/artifact/${artifactId}`)).not.toBeNull();
+		expect(await env.ARTIFACTS.head(`v1/team/${TEAM_ID}/artifact/${artifactId}`)).toBeNull();
+	});
+
+	it("falls back to main artifacts for pull request branch reads", async ({ expect }) => {
+		const artifactId = randomArtifactId();
+		const env = { ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, BRANCH_CACHE_POLICY: "main-write-pr-read", TURBO_TOKEN: TOKEN } satisfies Env;
+		await env.ARTIFACTS.put(`v1/team/${TEAM_ID}/artifact/${artifactId}`, new Uint8Array([9]), { httpMetadata: { contentType: "application/octet-stream" } });
+
+		const get = await handleRequest(new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?teamId=${TEAM_ID}&branch=pr-1`, { headers: { Authorization: `Bearer ${TOKEN}` } }), env, createExecutionContext());
+
+		expect(get.status).toBe(200);
+		expect(new Uint8Array(await get.arrayBuffer())).toEqual(new Uint8Array([9]));
+	});
+
+	it("rejects pull request writes in read-only branch policy", async ({ expect }) => {
+		const response = await handleRequest(
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${randomArtifactId()}?teamId=${TEAM_ID}&branch=pr-1`, {
+				body: new Uint8Array([1]),
+				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/octet-stream" },
+				method: "PUT",
+			}),
+			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, BRANCH_CACHE_POLICY: "read-only-pr", TURBO_TOKEN: TOKEN },
+			createExecutionContext()
+		);
+
+		expect(response.status).toBe(403);
+	});
+
+	it("extracts branch names from Turbo team slugs", async ({ expect }) => {
+		const artifactId = randomArtifactId();
+		const env = { ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, BRANCH_CACHE_POLICY: "isolated", TURBO_TOKEN: TOKEN } satisfies Env;
+
+		const put = await handleRequest(
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${artifactId}?slug=${TEAM_ID}@feature-b`, {
+				body: new Uint8Array([1]),
+				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/octet-stream" },
+				method: "PUT",
+			}),
+			env,
+			createExecutionContext()
+		);
+
+		expect(put.status).toBe(200);
+		expect(await env.ARTIFACTS.head(`v1/team/${TEAM_ID}/branch/feature-b/artifact/${artifactId}`)).not.toBeNull();
 	});
 
 	it("supports the optional KV artifact store", async ({ expect }) => {
@@ -1068,6 +1156,26 @@ describe("cache worker", () => {
 		expect(points.map((point) => point.blobs?.[0])).toEqual(["status", "preflight", "get_miss", "put", "get_hit", "head_hit", "events"]);
 		expect(points.find((point) => point.blobs?.[0] === "put")?.blobs?.[3]).toBe(artifactId.slice(0, 16));
 		expect(points.every((point) => point.indexes?.[0] !== undefined)).toBe(true);
+	});
+
+	it("emits signature monitoring metrics for unsigned uploads", async ({ expect }) => {
+		const points: AnalyticsPoint[] = [];
+		const analytics = { writeDataPoint: (point: AnalyticsPoint) => points.push(point) } as AnalyticsEngineDataset;
+		const ctx = createExecutionContext();
+
+		const response = await handleRequest(
+			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${randomArtifactId()}?teamId=${TEAM_ID}`, {
+				body: new Uint8Array([1]),
+				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/octet-stream" },
+				method: "PUT",
+			}),
+			{ ANALYTICS: analytics, ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, SIGNATURE_POLICY: "monitor", TURBO_TOKEN: TOKEN },
+			ctx
+		);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(200);
+		expect(points.map((point) => point.blobs?.[0])).toContain("signature_missing");
 	});
 
 	it("ignores analytics write failures", async ({ expect }) => {

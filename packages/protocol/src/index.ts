@@ -41,6 +41,7 @@ export const PREFLIGHT_ALLOW_HEADERS = [
 	ArtifactHeader.DirtyHash,
 	ArtifactHeader.ClientCi,
 	ArtifactHeader.ClientInteractive,
+	"x-turboflare-branch",
 	"x-ai-agent",
 ].join(", ");
 

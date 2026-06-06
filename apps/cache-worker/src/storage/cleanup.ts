@@ -17,14 +17,15 @@ export async function cleanupExpiredArtifacts(env: Env, now = Date.now()): Promi
 		return { deleted: 0, scanned: 0 };
 	}
 
-	const expiresBefore = new Date(now - config.retentionDays * MS_PER_DAY);
+	const artifactExpiresBefore = new Date(now - config.retentionDays * MS_PER_DAY);
+	const branchExpiresBefore = config.branchRetentionDays === 0 ? new Date(0) : new Date(now - config.branchRetentionDays * MS_PER_DAY);
 	let cursor: string | undefined;
 	let deleted = 0;
 	let scanned = 0;
 
 	do {
 		const listed = await listStoredArtifacts(env, `${ARTIFACT_NAMESPACE_VERSION}/`, cursor);
-		const expired = listed.objects.filter((object) => object.uploaded < expiresBefore).map((object) => object.key);
+		const expired = listed.objects.filter((object) => object.uploaded < expiresBefore(object.key, artifactExpiresBefore, branchExpiresBefore)).map((object) => object.key);
 		const remaining = config.cleanupMaxDelete - deleted;
 		const selected = expired.slice(0, remaining);
 
@@ -40,4 +41,8 @@ export async function cleanupExpiredArtifacts(env: Env, now = Date.now()): Promi
 	} while (cursor !== undefined);
 
 	return { deleted, scanned };
+}
+
+function expiresBefore(key: string, artifactExpiresBefore: Date, branchExpiresBefore: Date): Date {
+	return key.includes("/branch/") ? branchExpiresBefore : artifactExpiresBefore;
 }

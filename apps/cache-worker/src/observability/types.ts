@@ -6,6 +6,7 @@ export enum MetricEvent {
 	HeadMiss = "head_miss",
 	Preflight = "preflight",
 	Put = "put",
+	SignatureMissing = "signature_missing",
 	Status = "status",
 }
 
