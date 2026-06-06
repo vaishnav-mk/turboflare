@@ -7,7 +7,9 @@
 	"scripts": {
 		"build": "turbo run build",
 		"check": "pnpm typecheck && pnpm test && pnpm test:integration && pnpm build && pnpm r2:lifecycle:dry-run",
+		"cache:warm": "node scripts/ci/warm-cache.mjs",
 		"dev": "pnpm --filter @turboflare/cache-worker dev",
+		"prune:smoke": "node scripts/ci/prune-smoke.mjs",
 		"r2:lifecycle": "node scripts/r2/put-lifecycle.mjs",
 		"r2:lifecycle:dry-run": "node scripts/r2/put-lifecycle.mjs --dry-run",
 		"test": "turbo run test",
