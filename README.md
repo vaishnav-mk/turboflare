@@ -35,6 +35,8 @@ Current implementation details:
 - `HEAD` uses `R2.head()`.
 - Optional KV artifact storage is available with `ARTIFACT_STORE=kv` and `ARTIFACTS_KV`, capped by KV's 25 MiB value limit.
 - Turbo metadata is stored with the selected artifact store and returned as headers.
+- Optional signature policy can require signed Turbo artifact metadata.
+- Optional branch-aware cache policies can isolate PR branches or make PR writes read-only.
 - Static bearer auth supports one token or a comma-separated token allowlist.
 - Optional scoped static tokens restrict tokens to read/write scopes and team keys.
 - `slug`, `teamId`, and `team` query selectors are accepted for compatibility with existing cache servers.
@@ -45,6 +47,7 @@ Current implementation details:
 - Optional Rate Limiting binding enforcement keys limits by team and token.
 - Optional D1 artifact indexing records upload metadata for larger installations.
 - Scheduled cleanup can remove expired artifacts under the versioned key prefix.
+- Branch artifacts can use shorter retention than mainline artifacts.
 - `/internal/*` routes are separated from Turbo bearer auth and protected by a dedicated internal admin token.
 - Lightweight `/v2/user`, `/v2/teams`, and `/v2/teams/:id` compatibility routes support Turbo user/team discovery with existing bearer tokens.
 
@@ -85,6 +88,31 @@ For team-scoped static tokens, set `TURBO_TOKEN_SCOPES` to a JSON array:
 ```
 
 Use `TURBO_TOKEN` for simple single-tenant deployments. Use `TURBO_TOKEN_SCOPES` when one Worker serves more than one team.
+
+## Signatures and Branch Policies
+
+Turbo can sign remote cache artifacts with `TURBO_REMOTE_CACHE_SIGNATURE_KEY`. Turboflare preserves `x-artifact-sha` metadata and can require it on uploads:
+
+```txt
+SIGNATURE_POLICY=off|accept|monitor|require
+```
+
+Branch-aware cache policy is optional and disabled by default:
+
+```txt
+BRANCH_CACHE_POLICY=shared|isolated|main-write-pr-read|read-only-pr
+DEFAULT_BRANCH=main
+BRANCH_RETENTION_DAYS=7
+```
+
+Branch names can be supplied with `?branch=<name>`, `x-turboflare-branch`, or stock Turbo team slugs using `TURBO_TEAM=team@branch`. Branch keys use `v1/team/{teamKey}/branch/{branch}/artifact/{artifactId}`. Existing default keys remain `v1/team/{teamKey}/artifact/{artifactId}`.
+
+Policy behavior:
+
+- `shared` keeps current key behavior.
+- `isolated` stores each branch in its own namespace.
+- `main-write-pr-read` writes non-default branches to branch namespaces and falls back to main artifacts on reads.
+- `read-only-pr` lets non-default branches read main artifacts but rejects writes.
 
 ## Artifact Storage
 
@@ -157,8 +185,34 @@ Optional Worker variables and bindings:
 - `RATE_LIMITER` can be bound to Cloudflare Workers Rate Limiting. It is enforced after auth with keys shaped as `team:{teamKey}:token:{tokenId}`.
 - `INTERNAL_ADMIN_TOKEN` protects `/internal/*` and is separate from `TURBO_TOKEN`.
 - `RETENTION_DAYS` controls scheduled R2 artifact cleanup. The default is `30`.
+- `BRANCH_RETENTION_DAYS` controls scheduled cleanup for branch namespace artifacts. It defaults to `RETENTION_DAYS`.
 - `CLEANUP_MAX_DELETE` caps scheduled deletions per run. The default is `1000`.
 - `ABORT_MULTIPART_DAYS` controls the R2 lifecycle rule for stale multipart uploads when running `pnpm r2:lifecycle`. The default is `1`.
+
+## Cache Warmup and Prune Smoke
+
+Warm the remote cache without reading local cache:
+
+```sh
+TURBO_API=... TURBO_TOKEN=... TURBO_TEAM=main pnpm cache:warm
+```
+
+Optional filters and tasks:
+
+```sh
+TURBO_WARM_TASKS="build test" TURBO_WARM_FILTERS="web...,api..." pnpm cache:warm
+```
+
+Verify a pruned Docker workspace can write and then read remote cache:
+
+```sh
+PRUNE_CWD=fixtures/complex-turbo-monorepo TURBO_API=... TURBO_TOKEN=... TURBO_TEAM=prune-smoke pnpm prune:smoke web
+```
+
+GitHub workflows are included for both paths:
+
+- `.github/workflows/cache-warm.yml`
+- `.github/workflows/prune-smoke.yml`
 
 Use R2 `Standard` storage for cache artifacts. Turborepo cache artifacts are usually hot and short-lived, so Infrequent Access is not the default.
 
