@@ -39,15 +39,19 @@ function comparisonMarkdown(withProfile, withoutProfile) {
 	const withoutSteps = byId(withoutProfile.steps);
 	const ids = [...new Set([...Object.keys(withSteps), ...Object.keys(withoutSteps)])];
 	const totals = {
+		withIncludingWarmup: totalDuration([...withProfile.warmupSteps, ...withProfile.steps]),
 		with: totalDuration(withProfile.steps),
 		without: totalDuration(withoutProfile.steps),
 	};
 	const lines = [
 		"# ci comparison",
 		"",
+		"This compares the measured warm Turborepo profile against equivalent direct commands. The GitHub job duration also includes checkout, install, and the explicit Turborepo warmup step.",
+		"",
 		`with turborepo: ${withProfile.success ? "pass" : "fail"}`,
 		`without turborepo: ${withoutProfile.success ? "pass" : "fail"}`,
 		`fastest profile: ${totals.with < totals.without ? "with turborepo" : "without turborepo"}`,
+		`with turborepo including warmup: ${formatDuration(totals.withIncludingWarmup)}`,
 		"",
 		"| step | with turborepo | without turborepo | delta | % diff | faster |",
 		"| --- | ---: | ---: | ---: | ---: | --- |",
