@@ -7,23 +7,28 @@ const noCache = JSON.parse(await readFile("ci-results/no-cache/profile.json", "u
 const seed = JSON.parse(await readFile("ci-results/seed/profile.json", "utf8"));
 const rebuild = JSON.parse(await readFile("ci-results/rebuild/profile.json", "utf8"));
 
-const coldMs = noCache.buildMs;
-const seedMs = seed.buildMs;
-const warmMs = rebuild.buildMs;
-const savedMs = coldMs - warmMs;
-const speedup = coldMs > 0 ? ((savedMs / coldMs) * 100) : 0;
-
+const coldWall = noCache.wallMs;
+const seedWall = seed.wallMs;
+const rebuildWall = rebuild.wallMs;
+const savedMs = coldWall - rebuildWall;
+const speedup = coldWall > 0 ? ((savedMs / coldWall) * 100) : 0;
 const verdict = speedup > 10 ? "faster" : speedup > 0 ? "marginal" : "no improvement";
 
-const md = `# CI Cache Comparison
+const bar = (ms, max) => {
+	const width = Math.max(1, Math.round((ms / max) * 30));
+	return "`" + "█".repeat(width) + "░".repeat(30 - width) + "`";
+};
+const maxMs = Math.max(coldWall, seedWall, rebuildWall);
 
-## Results
+const md = `# Turboflare CI Cache Benchmark
 
-| Step | Time | Cache hits | Cache misses |
-| --- | ---: | ---: | ---: |
-| Cold build (no cache) | ${fmt(coldMs)} | ${noCache.cacheHits} | ${noCache.cacheBypasses ?? noCache.cacheMisses} bypasses |
-| Seed remote cache | ${fmt(seedMs)} | ${seed.cacheHits} | ${seed.cacheMisses} misses |
-| **Rebuild from remote** | **${fmt(warmMs)}** | **${rebuild.cacheHits}** | **${rebuild.cacheMisses}** |
+## Overview
+
+| | Time | Bar |
+| --- | ---: | --- |
+| Cold build (no cache) | ${fmt(coldWall)} | ${bar(coldWall, maxMs)} |
+| Seed remote cache | ${fmt(seedWall)} | ${bar(seedWall, maxMs)} |
+| **Rebuild (remote hits)** | **${fmt(rebuildWall)}** | ${bar(rebuildWall, maxMs)} |
 
 ## Summary
 
@@ -31,17 +36,39 @@ const md = `# CI Cache Comparison
 | --- | ---: |
 | **Time saved** | **${fmt(savedMs)}** |
 | **Speedup** | **${speedup.toFixed(1)}%** |
-| Tasks cached on rebuild | ${rebuild.cached} / ${rebuild.tasks} |
+| Tasks cached on rebuild | ${rebuild.cached} / ${rebuild.taskCount} |
 | Verdict | **${verdict}** |
+
+## Per-task breakdown: Cold build (no cache)
+
+| Task | Duration | Cache |
+| --- | ---: | --- |
+${taskRows(noCache.tasks)}
+| **Total (turbo)** | **${fmt(noCache.turboMs)}** | |
+| **Total (wall)** | **${fmt(noCache.wallMs)}** | |
+
+## Per-task breakdown: Seed (cold + upload)
+
+| Task | Duration | Cache |
+| --- | ---: | --- |
+${taskRows(seed.tasks)}
+| **Total (turbo)** | **${fmt(seed.turboMs)}** | |
+| **Total (wall)** | **${fmt(seed.wallMs)}** | |
+
+## Per-task breakdown: Rebuild (remote cache)
+
+| Task | Duration | Cache | Time saved |
+| --- | ---: | --- | ---: |
+${taskRows(rebuild.tasks, true)}
+| **Total (turbo)** | **${fmt(rebuild.turboMs)}** | | |
+| **Total (wall)** | **${fmt(rebuildWall)}** | | |
 
 ## How this works
 
-1. **without turborepo** — runs all CI tasks (\`typecheck\`, \`test\`, \`test:integration\`, \`build\`) with \`--cache=local:\`. Zero caching. Full cold build every time.
-2. **with turborepo (seed)** — same tasks, but writes artifacts to Turboflare remote cache (\`remote:w\`). This is the first-run cost.
-3. **with turborepo (rebuild)** — runs on a separate runner with empty local cache, reads only from remote (\`remote:r\`). This simulates a subsequent CI run after the cache is warm.
-4. **Speedup** = \`(cold - rebuild) / cold × 100\`
-
-In real-world usage, step 2 happens once (or when code changes), and every subsequent CI run gets step 3 speeds.
+1. **Cold build** — all CI tasks with \`--cache=local:\`. Zero caching.
+2. **Seed** — same tasks, writes to Turboflare (\`remote:w\`). First-run cost.
+3. **Rebuild** — separate runner, empty local cache, reads only from Turboflare (\`remote:r\`). Simulates a subsequent CI run.
+4. **Speedup** = (cold wall − rebuild wall) / cold wall × 100
 `;
 
 await writeFile(`${outputDir}/comparison.md`, md);
@@ -50,13 +77,24 @@ if (process.env.GITHUB_STEP_SUMMARY) {
 	await writeFile(process.env.GITHUB_STEP_SUMMARY, md, { flag: "a" });
 }
 
-console.log(`cold: ${fmt(coldMs)}  seed: ${fmt(seedMs)}  warm: ${fmt(warmMs)}  saved: ${fmt(savedMs)}  speedup: ${speedup.toFixed(1)}%  verdict: ${verdict}`);
+console.log(`cold: ${fmt(coldWall)}  seed: ${fmt(seedWall)}  warm: ${fmt(rebuildWall)}  saved: ${fmt(savedMs)}  speedup: ${speedup.toFixed(1)}%`);
+
+function taskRows(tasks, showSaved = false) {
+	if (!tasks || tasks.length === 0) return "| (no task data) | | |\n";
+	return tasks.map((t) => {
+		const status = t.cacheRemote ? `${t.cacheStatus} (remote)` : t.cacheStatus;
+		const saved = showSaved && t.timeSaved ? fmt(t.timeSaved) : "";
+		return showSaved
+			? `| \`${t.taskId}\` | ${fmt(t.durationMs)} | ${status} | ${saved} |`
+			: `| \`${t.taskId}\` | ${fmt(t.durationMs)} | ${status} |`;
+	}).join("\n") + "\n";
+}
 
 function fmt(ms) {
 	if (ms < 0) return `-${fmt(-ms)}`;
 	if (ms < 1000) return `${ms}ms`;
 	const s = ms / 1000;
-	if (s < 60) return `${s.toFixed(1)}s`;
+	if (s < 60) return `${s.toFixed(2)}s`;
 	const m = Math.floor(s / 60);
 	return `${m}m ${(s % 60).toFixed(0)}s`;
 }

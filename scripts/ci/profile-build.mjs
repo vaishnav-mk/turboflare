@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile, readdir } from "node:fs/promises";
+import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 
 const mode = process.argv.includes("--mode") ? process.argv[process.argv.indexOf("--mode") + 1] : "no-cache";
@@ -11,50 +12,24 @@ await mkdir(outputDir, { recursive: true });
 
 if (mode === "no-cache") {
 	const result = await runTurbo("no-cache", "local:");
-	await writeProfile({
-		mode: "no-cache",
-		buildMs: result.durationMs,
-		cacheHits: result.cacheHits,
-		cacheMisses: result.cacheMisses,
-		cacheBypasses: result.cacheBypasses,
-		cached: result.cached,
-		tasks: tasks.length,
-	});
-	console.log(`no-cache build: ${fmt(result.durationMs)} (${result.cacheBypasses} bypasses)`);
+	await writeProfile({ mode: "no-cache", ...result });
+	log("no-cache", result);
 } else if (mode === "seed") {
-	const turboEnv = remoteEnv();
-	const result = await runTurbo("seed", "local:,remote:w", turboEnv);
-	await writeProfile({
-		mode: "seed",
-		buildMs: result.durationMs,
-		cacheHits: result.cacheHits,
-		cacheMisses: result.cacheMisses,
-		cached: result.cached,
-		tasks: tasks.length,
-	});
-	console.log(`seed: ${fmt(result.durationMs)} (${result.cacheMisses} misses, uploaded to remote)`);
+	const result = await runTurbo("seed", "local:,remote:w", remoteEnv());
+	await writeProfile({ mode: "seed", ...result });
+	log("seed", result);
 } else if (mode === "rebuild") {
-	const turboEnv = remoteEnv();
 	const internalToken = process.env.INTERNAL_ADMIN_TOKEN;
 	try {
-		const result = await runTurbo("rebuild", "local:,remote:r", turboEnv);
+		const result = await runTurbo("rebuild", "local:,remote:r", remoteEnv());
 		if (result.cacheHits === 0) {
 			throw new Error(`expected cache hits on rebuild but got 0\n${result.stdoutTail}`);
 		}
-		await writeProfile({
-			mode: "rebuild",
-			buildMs: result.durationMs,
-			cacheHits: result.cacheHits,
-			cacheMisses: result.cacheMisses,
-			cached: result.cached,
-			tasks: tasks.length,
-		});
-		console.log(`rebuild: ${fmt(result.durationMs)} (${result.cacheHits} hits, ${result.cacheMisses} misses)`);
+		await writeProfile({ mode: "rebuild", ...result });
+		log("rebuild", result);
 	} finally {
 		if (internalToken) {
-			const api = env("TURBO_API");
-			const team = env("TURBO_TEAM");
-			await purge(api, internalToken, team).catch((e) => console.warn("purge failed:", e.message));
+			await purge(env("TURBO_API"), internalToken, env("TURBO_TEAM")).catch((e) => console.warn("purge failed:", e.message));
 		}
 	}
 } else {
@@ -71,24 +46,71 @@ function remoteEnv() {
 }
 
 function runTurbo(id, cacheMode, extraEnv = {}) {
-	const args = ["turbo", "run", ...tasks, "--cache", cacheMode, "--remote-cache-timeout", timeout, "--output-logs=new-only"];
+	const args = ["turbo", "run", ...tasks, "--cache", cacheMode, "--remote-cache-timeout", timeout, "--output-logs=new-only", "--summarize"];
 	return new Promise((resolve, reject) => {
 		const t0 = performance.now();
 		console.log(`$ pnpm ${args.join(" ")}`);
-		execFile("pnpm", args, { env: { ...process.env, ...extraEnv } }, (error, stdout, stderr) => {
-			const durationMs = Math.round(performance.now() - t0);
+		execFile("pnpm", args, { env: { ...process.env, ...extraEnv } }, async (error, stdout, stderr) => {
+			const wallMs = Math.round(performance.now() - t0);
 			const cacheHits = (stdout.match(/cache hit/gi) || []).length;
 			const cacheMisses = (stdout.match(/cache miss/gi) || []).length;
 			const cacheBypasses = (stdout.match(/cache bypass/gi) || []).length;
 			const cached = parseInt((stdout.match(/(\d+) cached/i) || [])[1] || "0", 10);
 			const stdoutTail = stdout.split("\n").filter(Boolean).slice(-15).join("\n");
+
 			if (error) {
 				reject(new Error(`${id} failed (${error.code})\n${stdoutTail}\n${stderr.slice(-500)}`));
 				return;
 			}
-			resolve({ id, durationMs, cacheHits, cacheMisses, cacheBypasses, cached, stdoutTail });
+
+			const taskDetails = await parseSummary();
+
+			resolve({
+				id,
+				wallMs,
+				turboMs: taskDetails.turboMs,
+				cacheHits,
+				cacheMisses,
+				cacheBypasses,
+				cached,
+				tasks: taskDetails.tasks,
+				taskCount: tasks.length,
+				stdoutTail,
+			});
 		});
 	});
+}
+
+async function parseSummary() {
+	const runsDir = join(process.cwd(), ".turbo", "runs");
+	let files;
+	try {
+		files = await readdir(runsDir);
+	} catch {
+		return { turboMs: 0, tasks: [] };
+	}
+	const jsonFiles = files.filter((f) => f.endsWith(".json")).sort().reverse();
+	if (jsonFiles.length === 0) return { turboMs: 0, tasks: [] };
+
+	const summary = JSON.parse(await readFile(join(runsDir, jsonFiles[0]), "utf8"));
+	const exec = summary.execution || {};
+	const turboMs = (exec.endTime && exec.startTime) ? exec.endTime - exec.startTime : 0;
+
+	const taskList = (summary.tasks || []).map((t) => {
+		const dur = (t.execution?.endTime && t.execution?.startTime) ? t.execution.endTime - t.execution.startTime : 0;
+		return {
+			taskId: t.taskId,
+			package: t.package,
+			hash: t.hash?.slice(0, 8),
+			durationMs: dur,
+			cacheStatus: t.cache?.status || "UNKNOWN",
+			cacheLocal: !!t.cache?.local,
+			cacheRemote: !!t.cache?.remote,
+			timeSaved: t.cache?.timeSaved || 0,
+		};
+	});
+
+	return { turboMs, tasks: taskList };
 }
 
 async function purge(api, token, team) {
@@ -101,6 +123,13 @@ async function purge(api, token, team) {
 
 async function writeProfile(data) {
 	await writeFile(`${outputDir}/profile.json`, JSON.stringify(data, null, 2) + "\n");
+}
+
+function log(label, r) {
+	console.log(`${label}: wall=${fmt(r.wallMs)} turbo=${fmt(r.turboMs)} hits=${r.cacheHits} misses=${r.cacheMisses} bypasses=${r.cacheBypasses}`);
+	for (const t of r.tasks) {
+		console.log(`  ${t.taskId}: ${fmt(t.durationMs)} [${t.cacheStatus}]${t.cacheRemote ? " remote" : ""}${t.timeSaved ? ` saved=${fmt(t.timeSaved)}` : ""}`);
+	}
 }
 
 function env(k) {
