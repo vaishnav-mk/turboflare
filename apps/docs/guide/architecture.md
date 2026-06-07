@@ -27,7 +27,7 @@ PUT /v8/artifacts/:artifactId
   -> resolve tenant/team/branch
   -> enforce read-only and signature policy
   -> validate size/content type
-  -> stream request.body into R2.put()
+  -> stream request.body into R2.put(), or buffer up to the size cap when Content-Length is absent
   -> index metadata in background if ARTIFACT_INDEX is bound
 ```
 
@@ -91,15 +91,15 @@ Analytics datapoint exists -> reporting only
 
 ## Optional Cloudflare products
 
-| Product          | Binding          | Why it is used                                                                      |
-| ---------------- | ---------------- | ----------------------------------------------------------------------------------- |
-| R2               | `ARTIFACTS`      | durable, streaming artifact storage; default source of truth                        |
-| KV               | `ARTIFACTS_KV`   | explicit small-artifact fallback for simple experiments                             |
-| D1               | `TOKEN_DB`       | dynamic token auth: hashed tokens, teams, scopes, expiry, revocation, audit log     |
-| D1               | `ARTIFACT_INDEX` | queryable artifact metadata for admin/search/reporting; not required for cache hits |
-| Cache API        | none             | optional edge acceleration for small repeated reads                                 |
-| Analytics Engine | `ANALYTICS`      | non-blocking metrics for hit/miss/status/upload/event traffic                       |
-| Rate Limiting    | `RATE_LIMITER`   | optional per-token or per-team request limiting                                     |
+| Product          | Binding          | Why it is used                                                                            |
+| ---------------- | ---------------- | ----------------------------------------------------------------------------------------- |
+| R2               | `ARTIFACTS`      | durable artifact storage with streaming for normal Turbo uploads; default source of truth |
+| KV               | `ARTIFACTS_KV`   | explicit small-artifact fallback for simple experiments                                   |
+| D1               | `TOKEN_DB`       | dynamic token auth: hashed tokens, teams, scopes, expiry, revocation, audit log           |
+| D1               | `ARTIFACT_INDEX` | queryable artifact metadata for admin/search/reporting; not required for cache hits       |
+| Cache API        | none             | optional edge acceleration for small repeated reads                                       |
+| Analytics Engine | `ANALYTICS`      | non-blocking metrics for hit/miss/status/upload/event traffic                             |
+| Rate Limiting    | `RATE_LIMITER`   | optional per-token or per-team request limiting                                           |
 
 Each optional binding can fail closed or be absent without changing the default Worker + R2 cache behavior. Artifact bodies live in R2/KV. Token state lives in D1 only when `TOKEN_DB` is enabled. Metrics live in Analytics Engine only when `ANALYTICS` is bound.
 

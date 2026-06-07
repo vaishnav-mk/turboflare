@@ -1,6 +1,6 @@
 # Storage & Retention
 
-R2 is Turboflare's default storage layer. It keeps the Worker hot path simple and avoids buffering artifacts in memory.
+R2 is Turboflare's default storage layer. It keeps the Worker hot path simple and streams normal Turbo uploads. If an upload omits `Content-Length`, Turboflare buffers up to `MAX_ARTIFACT_BYTES` so the same size guard still applies.
 
 ![Storage lifecycle diagram](/diagrams/storage-lifecycle.svg)
 
@@ -137,14 +137,12 @@ ARTIFACT_STORE=kv
 
 Bind `ARTIFACTS_KV` when using it.
 
-| R2                        | KV                                         |
-| ------------------------- | ------------------------------------------ |
-| streams uploads/downloads | buffers upload body                        |
-| supports large artifacts  | 25 MiB value cap                           |
-| metadata-only `head()`    | `getWithMetadata()` reads the stored value |
-| R2 lifecycle support      | Worker cleanup only                        |
-| recommended default       | small-artifact fallback                    |
-
-KV uploads require `Content-Length`.
+| R2                               | KV                                         |
+| -------------------------------- | ------------------------------------------ |
+| streams normal uploads/downloads | buffers upload body                        |
+| supports large artifacts         | 25 MiB value cap                           |
+| metadata-only `head()`           | `getWithMetadata()` reads the stored value |
+| R2 lifecycle support             | Worker cleanup only                        |
+| recommended default              | small-artifact fallback                    |
 
 KV mode is useful for testing or very small artifacts, but it is not the recommended production store. The Worker keeps the same `/v8` protocol in both modes; only the artifact backend changes.

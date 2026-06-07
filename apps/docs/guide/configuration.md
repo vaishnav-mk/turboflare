@@ -24,20 +24,20 @@ Default R2 binding:
 
 ## Common variables
 
-| Name                    | Values                                                     | Default          | Purpose                                  |
-| ----------------------- | ---------------------------------------------------------- | ---------------- | ---------------------------------------- |
-| `CACHE_STATUS`          | `enabled`, `disabled`, `over_limit`, `paused`              | `enabled`        | status response                          |
-| `READ_ONLY`             | `true`, `false`                                            | `false`          | reject writes while allowing reads       |
-| `SIGNATURE_POLICY`      | `off`, `accept`, `monitor`, `require`                      | `off`            | preserve or require Turbo signature tags |
-| `BRANCH_CACHE_POLICY`   | `shared`, `isolated`, `main-write-pr-read`, `read-only-pr` | `shared`         | branch cache behavior                    |
-| `DEFAULT_BRANCH`        | branch name                                                | `main`           | mainline branch for branch policies      |
-| `RETENTION_DAYS`        | number                                                     | `30`             | Worker cleanup and lifecycle default     |
-| `BRANCH_RETENTION_DAYS` | number                                                     | `RETENTION_DAYS` | shorter branch cleanup                   |
-| `CLEANUP_MAX_DELETE`    | number                                                     | `1000`           | max deletes per scheduled cleanup        |
-| `MAX_ARTIFACT_BYTES`    | bytes                                                      | `524288000`      | upload cap when `Content-Length` exists  |
-| `CACHE_API_READS`       | `true`, `false`                                            | `false`          | fill Cloudflare Cache API after R2 reads |
-| `CACHE_API_MAX_BYTES`   | bytes                                                      | `10485760`       | largest Cache API-eligible artifact      |
-| `ARTIFACT_STORE`        | `r2`, `kv`                                                 | `r2`             | choose R2 or KV artifact store           |
+| Name                    | Values                                                     | Default          | Purpose                                             |
+| ----------------------- | ---------------------------------------------------------- | ---------------- | --------------------------------------------------- |
+| `CACHE_STATUS`          | `enabled`, `disabled`, `over_limit`, `paused`              | `enabled`        | status response                                     |
+| `READ_ONLY`             | `true`, `false`                                            | `false`          | reject writes while allowing reads                  |
+| `SIGNATURE_POLICY`      | `off`, `accept`, `monitor`, `require`                      | `off`            | preserve or require Turbo signature tags            |
+| `BRANCH_CACHE_POLICY`   | `shared`, `isolated`, `main-write-pr-read`, `read-only-pr` | `shared`         | branch cache behavior                               |
+| `DEFAULT_BRANCH`        | branch name                                                | `main`           | mainline branch for branch policies                 |
+| `RETENTION_DAYS`        | number                                                     | `30`             | Worker cleanup and lifecycle default                |
+| `BRANCH_RETENTION_DAYS` | number                                                     | `RETENTION_DAYS` | shorter branch cleanup                              |
+| `CLEANUP_MAX_DELETE`    | number                                                     | `1000`           | max deletes per scheduled cleanup                   |
+| `MAX_ARTIFACT_BYTES`    | bytes                                                      | `524288000`      | upload cap; no-length uploads buffer up to this cap |
+| `CACHE_API_READS`       | `true`, `false`                                            | `false`          | fill Cloudflare Cache API after R2 reads            |
+| `CACHE_API_MAX_BYTES`   | bytes                                                      | `10485760`       | largest Cache API-eligible artifact                 |
+| `ARTIFACT_STORE`        | `r2`, `kv`                                                 | `r2`             | choose R2 or KV artifact store                      |
 
 ## Optional bindings
 
@@ -62,18 +62,20 @@ These bindings are independent. The smallest production setup is still just `ART
 
 ## Routes
 
-| Route                  | Method | Auth           | Purpose             |
-| ---------------------- | ------ | -------------- | ------------------- |
-| `/management/health`   | `GET`  | none           | public health check |
-| `/v8/artifacts/status` | `GET`  | Turbo token    | cache status        |
-| `/v8/artifacts/:id`    | `PUT`  | write scope    | upload artifact     |
-| `/v8/artifacts/:id`    | `GET`  | read scope     | download artifact   |
-| `/v8/artifacts/:id`    | `HEAD` | read scope     | metadata lookup     |
-| `/v8/artifacts`        | `POST` | read scope     | batch lookup        |
-| `/v8/artifacts/events` | `POST` | read scope     | hit/miss events     |
-| `/v2/user`             | `GET`  | Turbo token    | Turbo compatibility |
-| `/v2/teams`            | `GET`  | Turbo token    | Turbo compatibility |
-| `/internal/*`          | mixed  | internal token | admin operations    |
+| Route                  | Method    | Auth           | Purpose             |
+| ---------------------- | --------- | -------------- | ------------------- |
+| `/management/health`   | `GET`     | none           | public health check |
+| `/v8/artifacts/status` | `GET`     | Turbo token    | cache status        |
+| `/v8/artifacts/:id`    | `PUT`     | write scope    | upload artifact     |
+| `/v8/artifacts/:id`    | `GET`     | read scope     | download artifact   |
+| `/v8/artifacts/:id`    | `HEAD`    | read scope     | metadata lookup     |
+| `/v8/artifacts`        | `POST`    | read scope     | batch lookup        |
+| `/v8/artifacts/events` | `POST`    | read scope     | hit/miss events     |
+| `/v8/artifacts/events` | `GET`     | read scope     | empty event history |
+| `/v8/*`                | `OPTIONS` | none           | preflight response  |
+| `/v2/user`             | `GET`     | Turbo token    | Turbo compatibility |
+| `/v2/teams`            | `GET`     | Turbo token    | Turbo compatibility |
+| `/internal/*`          | mixed     | internal token | admin operations    |
 
 ## Cloudflare Pages or Workers Builds
 

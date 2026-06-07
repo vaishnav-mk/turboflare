@@ -96,19 +96,19 @@ R2 is the recommended artifact store. KV exists only as an opt-in fallback and i
 
 ### Common Optional Vars
 
-| Name                    | Values                                                     | Purpose                                                |
-| ----------------------- | ---------------------------------------------------------- | ------------------------------------------------------ |
-| `CACHE_STATUS`          | `enabled`, `disabled`, `over_limit`, `paused`              | status response                                        |
-| `READ_ONLY`             | `true` / `false`                                           | reject writes, allow reads                             |
-| `SIGNATURE_POLICY`      | `off`, `accept`, `monitor`, `require`                      | require/preserve Turbo `x-artifact-tag`                |
-| `BRANCH_CACHE_POLICY`   | `shared`, `isolated`, `main-write-pr-read`, `read-only-pr` | branch cache behavior                                  |
-| `DEFAULT_BRANCH`        | branch name                                                | default `main`                                         |
-| `RETENTION_DAYS`        | number                                                     | Worker cleanup/R2 lifecycle default                    |
-| `BRANCH_RETENTION_DAYS` | number                                                     | shorter branch artifact cleanup                        |
-| `MAX_ARTIFACT_BYTES`    | bytes                                                      | upload size guard when `Content-Length` exists         |
-| `CACHE_API_READS`       | `true` / `false`                                           | fill Cloudflare Cache API after R2 reads               |
-| `ARTIFACT_STORE`        | `r2`, `kv`                                                 | default `r2`; set `kv` only for small-artifact KV mode |
-| `INTERNAL_ADMIN_TOKEN`  | secret                                                     | protects `/internal/*`                                 |
+| Name                    | Values                                                     | Purpose                                                          |
+| ----------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------- |
+| `CACHE_STATUS`          | `enabled`, `disabled`, `over_limit`, `paused`              | status response                                                  |
+| `READ_ONLY`             | `true` / `false`                                           | reject writes, allow reads                                       |
+| `SIGNATURE_POLICY`      | `off`, `accept`, `monitor`, `require`                      | require/preserve Turbo `x-artifact-tag`                          |
+| `BRANCH_CACHE_POLICY`   | `shared`, `isolated`, `main-write-pr-read`, `read-only-pr` | branch cache behavior                                            |
+| `DEFAULT_BRANCH`        | branch name                                                | default `main`                                                   |
+| `RETENTION_DAYS`        | number                                                     | Worker cleanup/R2 lifecycle default                              |
+| `BRANCH_RETENTION_DAYS` | number                                                     | shorter branch artifact cleanup                                  |
+| `MAX_ARTIFACT_BYTES`    | bytes                                                      | upload size guard; no-length uploads are buffered up to this cap |
+| `CACHE_API_READS`       | `true` / `false`                                           | fill Cloudflare Cache API after R2 reads                         |
+| `ARTIFACT_STORE`        | `r2`, `kv`                                                 | default `r2`; set `kv` only for small-artifact KV mode           |
+| `INTERNAL_ADMIN_TOKEN`  | secret                                                     | protects `/internal/*`                                           |
 
 ### Optional Bindings
 

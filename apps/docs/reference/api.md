@@ -10,7 +10,7 @@ Turbo routes use:
 Authorization: Bearer <TURBO_TOKEN>
 ```
 
-`PUT /v8/artifacts/:artifactId` requires write scope. Status, lookup, events, `GET`, `HEAD`, and `/v2` compatibility routes require read scope.
+`PUT /v8/artifacts/:artifactId` requires write scope. Status, lookup, events, `GET`, `HEAD`, and `/v2` compatibility routes require read scope. `OPTIONS /v8/*` is an unauthenticated CORS-style preflight and returns `204`.
 
 Internal routes use:
 
@@ -32,7 +32,7 @@ Returns cache status.
 
 Uploads one artifact.
 
-Required:
+If present, this header must be:
 
 ```txt
 Content-Type: application/octet-stream
@@ -113,6 +113,14 @@ Response:
 { "accepted": true }
 ```
 
+### `GET /v8/artifacts/events`
+
+Returns an empty event history response for Turbo compatibility.
+
+```json
+[]
+```
+
 ## Compatibility routes
 
 | Route               | Purpose                          |
@@ -125,6 +133,7 @@ Response:
 
 | Route                    | Purpose                  |
 | ------------------------ | ------------------------ |
+| `GET /`                  | plain-text service label |
 | `GET /management/health` | empty `200` health check |
 
 ## Internal routes

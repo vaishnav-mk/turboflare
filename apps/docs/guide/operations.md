@@ -107,7 +107,7 @@ pnpm prune:smoke web
 | `403` on upload                 | token lacks write scope or team access                     | check scoped token teams/scopes                                         |
 | `403` on branch writes          | `read-only-pr` policy                                      | use default branch or change policy                                     |
 | no remote hits                  | different task hash, missing `TURBO_TEAM`, changed outputs | verify Turbo env and task outputs                                       |
-| KV upload rejected              | missing `Content-Length` or artifact too large             | use R2 or smaller artifacts                                             |
+| KV upload rejected              | artifact too large                                         | use R2 or smaller artifacts                                             |
 | internal route `503`            | admin token or optional binding missing                    | configure `INTERNAL_ADMIN_TOKEN`, `TOKEN_DB`, or `ARTIFACT_INDEX`       |
 | lifecycle script fails          | API token/account/bucket mismatch                          | check `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `R2_BUCKET_NAME` |
 
