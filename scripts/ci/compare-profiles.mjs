@@ -12,7 +12,7 @@ const seedWall = seed.wallMs;
 const rebuildWall = rebuild.wallMs;
 const savedMs = coldWall - rebuildWall;
 const speedup = coldWall > 0 ? ((savedMs / coldWall) * 100) : 0;
-const verdict = speedup > 10 ? "faster" : speedup > 0 ? "marginal" : "no improvement";
+const verdict = speedup > 10 ? "faster" : speedup > 0 ? "marginal" : speedup < -5 ? "regression" : "no improvement";
 
 const bar = (ms, max) => {
 	const width = Math.max(1, Math.round((ms / max) * 30));

@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, readFile, writeFile, readdir } from "node:fs/promises";
+import { mkdir, readFile, writeFile, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 
@@ -8,19 +8,29 @@ const outputDir = "ci-results";
 const tasks = ["typecheck", "test", "test:integration", "build"];
 const timeout = process.env.TURBO_REMOTE_CACHE_TIMEOUT ?? "20";
 
+function redact(value) {
+	let out = value;
+	if (process.env.TURBO_TOKEN) out = out.replaceAll(process.env.TURBO_TOKEN, "<redacted>");
+	if (process.env.INTERNAL_ADMIN_TOKEN) out = out.replaceAll(process.env.INTERNAL_ADMIN_TOKEN, "<redacted>");
+	return out;
+}
+
 await mkdir(outputDir, { recursive: true });
 
 if (mode === "no-cache") {
+	await clearTurboRuns();
 	const result = await runTurbo("no-cache", "local:");
 	await writeProfile({ mode: "no-cache", ...result });
 	log("no-cache", result);
 } else if (mode === "seed") {
+	await clearTurboRuns();
 	const result = await runTurbo("seed", "local:,remote:w", remoteEnv());
 	await writeProfile({ mode: "seed", ...result });
 	log("seed", result);
 } else if (mode === "rebuild") {
 	const internalToken = process.env.INTERNAL_ADMIN_TOKEN;
 	try {
+		await clearTurboRuns();
 		const result = await runTurbo("rebuild", "local:,remote:r", remoteEnv());
 		if (result.cacheHits === 0) {
 			throw new Error(`expected cache hits on rebuild but got 0\n${result.stdoutTail}`);
@@ -59,7 +69,7 @@ function runTurbo(id, cacheMode, extraEnv = {}) {
 			const stdoutTail = stdout.split("\n").filter(Boolean).slice(-15).join("\n");
 
 			if (error) {
-				reject(new Error(`${id} failed (${error.code})\n${stdoutTail}\n${stderr.slice(-500)}`));
+				reject(new Error(`${id} failed (${error.code})\n${redact(stdoutTail)}\n${redact(stderr.slice(-500))}`));
 				return;
 			}
 
@@ -74,11 +84,16 @@ function runTurbo(id, cacheMode, extraEnv = {}) {
 				cacheBypasses,
 				cached,
 				tasks: taskDetails.tasks,
-				taskCount: tasks.length,
+				taskCount: taskDetails.tasks.length || tasks.length,
 				stdoutTail,
 			});
 		});
 	});
+}
+
+async function clearTurboRuns() {
+	const runsDir = join(process.cwd(), ".turbo", "runs");
+	await rm(runsDir, { force: true, recursive: true }).catch(() => {});
 }
 
 async function parseSummary() {

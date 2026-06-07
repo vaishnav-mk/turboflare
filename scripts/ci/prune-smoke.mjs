@@ -17,7 +17,7 @@ const cwd = resolve(process.env.PRUNE_CWD ?? process.cwd());
 const turboBin = resolve(process.cwd(), "node_modules", ".bin", process.platform === "win32" ? "turbo.cmd" : "turbo");
 const outDir = await mkdtemp(join(tmpdir(), "turboflare-prune-"));
 const fullDir = join(outDir, "full");
-const generatedDirectories = new Set([".next", ".turbo", "dist"]);
+const generatedDirectories = new Set([".next", ".turbo", "dist", "node_modules"]);
 
 try {
 	await run(turboBin, ["prune", target, "--docker", "--out-dir", outDir], cwd);
@@ -52,7 +52,7 @@ function run(command, args, cwd) {
 			const durationMs = Date.now() - started;
 			console.log(JSON.stringify({ command, args, durationMs, cwd, stdout: summary(stdout), stderr: summary(stderr) }, null, 2));
 			if (error !== null) {
-				reject(new Error(`${error.message}\n${stdout}\n${stderr}`));
+				reject(new Error(`${error.message}\n${redact(stdout)}\n${redact(stderr)}`));
 				return;
 			}
 
@@ -80,9 +80,15 @@ async function removeGeneratedDirectories(root) {
 	);
 }
 
+function redact(value) {
+	let out = value;
+	if (process.env.TURBO_TOKEN) out = out.replaceAll(process.env.TURBO_TOKEN, "<redacted>");
+	return out;
+}
+
 function summary(value) {
-	return value
+	return redact(value
 		.split(/\r?\n/)
 		.filter((line) => /Remote caching|cache miss|cache hit|Tasks:|Cached:|Time:|warning|error/i.test(line))
-		.join("\n");
+		.join("\n"));
 }
