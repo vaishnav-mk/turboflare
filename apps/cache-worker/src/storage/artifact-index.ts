@@ -45,5 +45,6 @@ export async function deleteIndexedArtifacts(env: Env, keys: readonly string[]):
 		return;
 	}
 
-	await Promise.all(keys.map((key) => env.ARTIFACT_INDEX?.prepare(DELETE_ARTIFACT_QUERY).bind(key).run()));
+	const statements = keys.map((key) => env.ARTIFACT_INDEX!.prepare(DELETE_ARTIFACT_QUERY).bind(key));
+	await env.ARTIFACT_INDEX.batch(statements);
 }

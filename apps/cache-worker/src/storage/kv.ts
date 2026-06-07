@@ -59,7 +59,11 @@ export async function listKvArtifacts(env: Env, prefix: string, cursor?: string,
 }
 
 export async function deleteKvArtifacts(env: Env, keys: readonly string[]): Promise<void> {
-	await Promise.all(keys.map((key) => env.ARTIFACTS_KV?.delete(key)));
+	const results = await Promise.allSettled(keys.map((key) => env.ARTIFACTS_KV?.delete(key)));
+	const failures = results.filter((r) => r.status === "rejected");
+	if (failures.length > 0) {
+		console.error(`kv delete: ${failures.length}/${keys.length} failed`);
+	}
 }
 
 export function kvObjectSize(metadata: KvArtifactMetadata): number {

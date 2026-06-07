@@ -1,7 +1,7 @@
 import type { Env } from "../../app/env";
 import { ALL_TEAMS } from "../../auth/constants";
-import { authenticateBearer } from "../../auth/bearer";
-import type { AuthContext } from "../../auth/types";
+import { authenticateBearer, hasScope } from "../../auth/bearer";
+import { AuthScope, type AuthContext } from "../../auth/types";
 import { errorResponse, jsonResponse, methodNotAllowed } from "../../http/response";
 
 interface CompatTeam {
@@ -31,6 +31,9 @@ export async function handleVercelCompatibility(request: Request, env: Env): Pro
 	const authContext = await authenticateBearer(request, env);
 	if (authContext === null) {
 		return errorResponse(401, "unauthorized", "Missing or invalid bearer token", { "WWW-Authenticate": "Bearer" });
+	}
+	if (!hasScope(authContext, AuthScope.Read)) {
+		return errorResponse(403, "forbidden", "Token does not have the required scope");
 	}
 
 	if (url.pathname === USER_PATH) {

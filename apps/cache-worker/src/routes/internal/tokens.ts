@@ -17,8 +17,14 @@ export async function handleInternalTokens(request: Request, env: Env): Promise<
 			return methodNotAllowed(["POST"]);
 		}
 
-		const revoked = await revokeToken(env, tokenId);
-		return revoked === null ? tokenDbMissing() : jsonResponse({ revoked });
+		const result = await revokeToken(env, tokenId);
+		if (result === null) {
+			return tokenDbMissing();
+		}
+		if ("error" in result) {
+			return errorResponse(404, "not_found", "Token not found or already revoked");
+		}
+		return jsonResponse(result);
 	}
 
 	if (request.method === "GET") {

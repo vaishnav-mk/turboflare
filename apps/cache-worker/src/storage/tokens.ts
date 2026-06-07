@@ -73,15 +73,20 @@ export async function createToken(env: Env, input: CreateTokenInput): Promise<To
 	return { token: { expiresAt: parsed.expiresAt, id: parsed.id, revokedAt: null, scopes: parsed.scopes, teams: parsed.teams, token: parsed.token } };
 }
 
-export async function revokeToken(env: Env, tokenId: string, now = new Date()): Promise<RevokedToken | null> {
+export type RevokeResult = { error: "not_found" } | { revoked: RevokedToken };
+
+export async function revokeToken(env: Env, tokenId: string, now = new Date()): Promise<RevokeResult | null> {
 	if (env.TOKEN_DB === undefined) {
 		return null;
 	}
 
 	const revokedAt = now.toISOString();
-	await env.TOKEN_DB.prepare(REVOKE_TOKEN_QUERY).bind(revokedAt, tokenId).run();
+	const result = await env.TOKEN_DB.prepare(REVOKE_TOKEN_QUERY).bind(revokedAt, tokenId).run();
+	if (result.meta?.changes === 0) {
+		return { error: "not_found" };
+	}
 	await auditTokenAction(env, tokenId, "revoke", now);
-	return { id: tokenId, revokedAt };
+	return { revoked: { id: tokenId, revokedAt } };
 }
 
 async function auditTokenAction(env: Env, tokenId: string, action: "create" | "revoke", now = new Date()): Promise<void> {

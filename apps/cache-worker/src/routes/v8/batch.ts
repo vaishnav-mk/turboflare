@@ -33,11 +33,13 @@ async function readLookupRequest(request: Request): Promise<ArtifactLookupReques
 	}
 }
 
+const MAX_HASH_LENGTH = 256;
+
 function isLookupRequest(value: unknown): value is ArtifactLookupRequest {
 	if (typeof value !== "object" || value === null || !("hashes" in value)) {
 		return false;
 	}
 
 	const hashes = (value as { hashes: unknown }).hashes;
-	return Array.isArray(hashes) && hashes.every((hash) => typeof hash === "string" && hash.length > 0);
+	return Array.isArray(hashes) && hashes.every((hash) => typeof hash === "string" && hash.length > 0 && hash.length <= MAX_HASH_LENGTH);
 }

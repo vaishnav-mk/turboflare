@@ -1,4 +1,4 @@
-import { HttpMethod } from "@turboflare/protocol";
+import { CacheEventSource, CacheEventType, HttpMethod } from "@turboflare/protocol";
 
 import type { Env } from "../../app/env";
 import { errorResponse, jsonResponse, methodNotAllowed } from "../../http/response";
@@ -39,5 +39,5 @@ function isEvent(value: unknown): boolean {
 	}
 
 	const event = value as Record<string, unknown>;
-	return (event.event === "HIT" || event.event === "MISS") && (event.source === "LOCAL" || event.source === "REMOTE") && typeof event.hash === "string" && typeof event.duration === "number" && event.duration >= 0;
+	return (event.event === CacheEventType.Hit || event.event === CacheEventType.Miss) && (event.source === CacheEventSource.Local || event.source === CacheEventSource.Remote) && typeof event.hash === "string" && typeof event.duration === "number" && event.duration >= 0;
 }
