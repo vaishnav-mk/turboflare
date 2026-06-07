@@ -4,84 +4,120 @@ import { OCTET_STREAM } from "./constants";
 import type { ArtifactBodyObject, ArtifactMetadataObject } from "./metadata";
 
 interface KvArtifactMetadata extends Record<string, string> {
-	httpEtag: string;
-	size: string;
-	uploaded: string;
+  httpEtag: string;
+  size: string;
+  uploaded: string;
 }
 
 interface KvListedArtifact {
-	key: string;
-	metadata: KvArtifactMetadata;
+  key: string;
+  metadata: KvArtifactMetadata;
 }
 
-export async function putKvArtifact(env: Env, key: string, body: ReadableStream, customMetadata: Record<string, string>): Promise<ArtifactMetadataObject> {
-	const bytes = await new Response(body).arrayBuffer();
-	const metadata: KvArtifactMetadata = {
-		...customMetadata,
-		httpEtag: `"${await sha256Hex(bytes)}"`,
-		size: bytes.byteLength.toString(),
-		uploaded: new Date().toISOString(),
-	};
+export async function putKvArtifact(
+  env: Env,
+  key: string,
+  body: ReadableStream,
+  customMetadata: Record<string, string>,
+): Promise<ArtifactMetadataObject> {
+  const response = new Response(body);
+  const bytes = await response.arrayBuffer();
+  const etag = await sha256Hex(bytes);
+  const size = bytes.byteLength.toString();
+  const uploadedAt = new Date();
+  const metadata: KvArtifactMetadata = {
+    ...customMetadata,
+    httpEtag: `"${etag}"`,
+    size,
+    uploaded: uploadedAt.toISOString(),
+  };
 
-	await env.ARTIFACTS_KV?.put(key, bytes, { metadata });
-	return kvMetadataObject(metadata);
+  await env.ARTIFACTS_KV?.put(key, bytes, { metadata });
+  return kvMetadataObject(metadata);
 }
 
 export async function getKvArtifact(env: Env, key: string): Promise<ArtifactBodyObject | null> {
-	const result = await env.ARTIFACTS_KV?.getWithMetadata<KvArtifactMetadata>(key, { type: "stream" });
-	if (result === undefined || result.value === null || result.metadata === null) {
-		return null;
-	}
+  const result = await env.ARTIFACTS_KV?.getWithMetadata<KvArtifactMetadata>(key, {
+    type: "stream",
+  });
+  if (result === undefined || result.value === null || result.metadata === null) {
+    return null;
+  }
 
-	return { ...kvMetadataObject(result.metadata), body: result.value };
+  return { ...kvMetadataObject(result.metadata), body: result.value };
 }
 
-export async function headKvArtifact(env: Env, key: string): Promise<ArtifactMetadataObject | null> {
-	const result = await env.ARTIFACTS_KV?.getWithMetadata<KvArtifactMetadata>(key, { type: "stream" });
-	if (result === undefined || result.value === null || result.metadata === null) {
-		return null;
-	}
+export async function headKvArtifact(
+  env: Env,
+  key: string,
+): Promise<ArtifactMetadataObject | null> {
+  const result = await env.ARTIFACTS_KV?.getWithMetadata<KvArtifactMetadata>(key, {
+    type: "stream",
+  });
+  if (result === undefined || result.value === null || result.metadata === null) {
+    return null;
+  }
 
-	return kvMetadataObject(result.metadata);
+  return kvMetadataObject(result.metadata);
 }
 
-export async function listKvArtifacts(env: Env, prefix: string, cursor?: string, limit = 1000): Promise<{ cursor?: string; objects: readonly KvListedArtifact[]; truncated: boolean }> {
-	const result = await env.ARTIFACTS_KV?.list<KvArtifactMetadata>({ cursor, limit, prefix });
-	if (result === undefined) {
-		return { objects: [], truncated: false };
-	}
+export async function listKvArtifacts(
+  env: Env,
+  prefix: string,
+  cursor?: string,
+  limit = 1000,
+): Promise<{ cursor?: string; objects: readonly KvListedArtifact[]; truncated: boolean }> {
+  const result = await env.ARTIFACTS_KV?.list<KvArtifactMetadata>({ cursor, limit, prefix });
+  if (result === undefined) {
+    return { objects: [], truncated: false };
+  }
 
-	return {
-		cursor: result.list_complete ? undefined : result.cursor,
-		objects: result.keys.flatMap((key) => (key.metadata === undefined ? [] : [{ key: key.name, metadata: key.metadata }])),
-		truncated: !result.list_complete,
-	};
+  return {
+    cursor: result.list_complete ? undefined : result.cursor,
+    objects: result.keys.flatMap((key) =>
+      key.metadata === undefined ? [] : [{ key: key.name, metadata: key.metadata }],
+    ),
+    truncated: !result.list_complete,
+  };
 }
 
-export async function deleteKvArtifacts(env: Env, keys: readonly string[]): Promise<void> {
-	const results = await Promise.allSettled(keys.map((key) => env.ARTIFACTS_KV?.delete(key)));
-	const failures = results.filter((r) => r.status === "rejected");
-	if (failures.length > 0) {
-		console.error(`kv delete: ${failures.length}/${keys.length} failed`);
-	}
+export async function deleteKvArtifacts(
+  env: Env,
+  keys: readonly string[],
+): Promise<readonly string[]> {
+  const deletes = keys.map((key) => {
+    const namespace = env.ARTIFACTS_KV;
+    return namespace?.delete(key);
+  });
+  const results = await Promise.allSettled(deletes);
+  const failures = results.filter((r) => r.status === "rejected");
+  if (failures.length > 0) {
+    throw new Error(`kv delete: ${failures.length}/${keys.length} failed`);
+  }
+
+  return keys;
 }
 
 export function kvObjectSize(metadata: KvArtifactMetadata): number {
-	const size = Number.parseInt(metadata.size, 10);
-	return Number.isFinite(size) && size >= 0 ? size : 0;
+  const size = Number.parseInt(metadata.size, 10);
+  return Number.isFinite(size) && size >= 0 ? size : 0;
 }
 
 export function kvObjectUploaded(metadata: KvArtifactMetadata): Date {
-	const uploaded = Date.parse(metadata.uploaded);
-	return Number.isFinite(uploaded) ? new Date(uploaded) : new Date(0);
+  const uploaded = Date.parse(metadata.uploaded);
+  if (Number.isFinite(uploaded)) {
+    return new Date(uploaded);
+  }
+
+  return new Date(0);
 }
 
 function kvMetadataObject(metadata: KvArtifactMetadata): ArtifactMetadataObject {
-	return {
-		customMetadata: metadata,
-		httpEtag: metadata.httpEtag,
-		httpMetadata: { contentType: OCTET_STREAM },
-		size: kvObjectSize(metadata),
-		uploaded: kvObjectUploaded(metadata),
-	};
+  return {
+    customMetadata: metadata,
+    httpEtag: metadata.httpEtag,
+    httpMetadata: { contentType: OCTET_STREAM },
+    size: kvObjectSize(metadata),
+    uploaded: kvObjectUploaded(metadata),
+  };
 }

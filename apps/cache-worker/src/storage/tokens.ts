@@ -1,161 +1,231 @@
 import type { Env } from "../app/env";
 import { MAX_BEARER_TOKEN_LENGTH } from "../auth/constants";
 import { hashToken } from "../auth/d1";
-import { parseAuthScopes, parseAuthScopesJson, parseTeamKeys, parseTeamKeysJson } from "../auth/token-fields";
-import { AuthScope } from "../auth/types";
+import {
+  parseAuthScopes,
+  parseAuthScopesJson,
+  parseTeamKeys,
+  parseTeamKeysJson,
+} from "../auth/token-fields";
+import { AuthScope, type D1TokenRow } from "../auth/types";
 import { base64UrlBytes } from "../shared/base64";
 
 interface TokenRecord {
-	expiresAt: string | null;
-	id: string;
-	revokedAt: string | null;
-	scopes: readonly AuthScope[];
-	teams: readonly string[];
+  expiresAt: string | null;
+  id: string;
+  revokedAt: string | null;
+  scopes: readonly AuthScope[];
+  teams: readonly string[];
 }
 
 interface CreatedToken extends TokenRecord {
-	token: string;
+  token: string;
 }
 
 interface RevokedToken {
-	id: string;
-	revokedAt: string;
+  id: string;
+  revokedAt: string;
 }
 
 interface CreateTokenInput {
-	expiresAt?: unknown;
-	id?: unknown;
-	scopes?: unknown;
-	teams?: unknown;
-	token?: unknown;
-}
-
-interface TokenRow {
-	expires_at?: string | null;
-	id: string;
-	revoked_at?: string | null;
-	scopes: string;
-	teams: string;
+  expiresAt?: unknown;
+  id?: unknown;
+  scopes?: unknown;
+  teams?: unknown;
+  token?: unknown;
 }
 
 type TokenResult = { error: string } | { token: CreatedToken };
 
-const CREATE_TOKEN_QUERY = "insert into tokens (id, token_hash, teams, scopes, expires_at, revoked_at) values (?, ?, ?, ?, ?, null)";
-const INSERT_AUDIT_QUERY = "insert into token_audit (id, token_id, action, created_at) values (?, ?, ?, ?)";
-const LIST_TOKENS_QUERY = "select id, teams, scopes, expires_at, revoked_at from tokens order by id";
+const CREATE_TOKEN_QUERY =
+  "insert into tokens (id, token_hash, teams, scopes, expires_at, revoked_at) values (?, ?, ?, ?, ?, null)";
+const INSERT_AUDIT_QUERY =
+  "insert into token_audit (id, token_id, action, created_at) values (?, ?, ?, ?)";
+const LIST_TOKENS_QUERY =
+  "select id, teams, scopes, expires_at, revoked_at from tokens order by id";
 const REVOKE_TOKEN_QUERY = "update tokens set revoked_at = ? where id = ? and revoked_at is null";
 
 export async function listTokens(env: Env): Promise<readonly TokenRecord[] | null> {
-	if (env.TOKEN_DB === undefined) {
-		return null;
-	}
+  if (env.TOKEN_DB === undefined) {
+    return null;
+  }
 
-	const result = await env.TOKEN_DB.prepare(LIST_TOKENS_QUERY).all<TokenRow>();
-	return (result.results ?? []).map(tokenRecord);
+  const statement = env.TOKEN_DB.prepare(LIST_TOKENS_QUERY);
+  const result = await statement.all<D1TokenRow>();
+  const rows = result.results ?? [];
+  const tokens = rows.map(tokenRecord);
+  return tokens;
 }
 
 export async function createToken(env: Env, input: CreateTokenInput): Promise<TokenResult | null> {
-	if (env.TOKEN_DB === undefined) {
-		return null;
-	}
+  if (env.TOKEN_DB === undefined) {
+    return null;
+  }
 
-	const parsed = parseCreateToken(input);
-	if (typeof parsed === "string") {
-		return { error: parsed };
-	}
+  const parsed = parseCreateToken(input);
+  if (typeof parsed === "string") {
+    return { error: parsed };
+  }
 
-	const tokenHash = await hashToken(parsed.token);
-	await env.TOKEN_DB.prepare(CREATE_TOKEN_QUERY)
-		.bind(parsed.id, tokenHash, JSON.stringify(parsed.teams), JSON.stringify(parsed.scopes), parsed.expiresAt)
-		.run();
-	await auditTokenAction(env, parsed.id, "create");
+  const tokenHash = await hashToken(parsed.token);
+  const teams = JSON.stringify(parsed.teams);
+  const scopes = JSON.stringify(parsed.scopes);
+  const statement = env.TOKEN_DB.prepare(CREATE_TOKEN_QUERY);
+  const boundStatement = statement.bind(parsed.id, tokenHash, teams, scopes, parsed.expiresAt);
+  try {
+    await boundStatement.run();
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      return { error: "already_exists" };
+    }
+    throw error;
+  }
+  await auditTokenAction(env, parsed.id, "create");
 
-	return { token: { expiresAt: parsed.expiresAt, id: parsed.id, revokedAt: null, scopes: parsed.scopes, teams: parsed.teams, token: parsed.token } };
+  return {
+    token: {
+      expiresAt: parsed.expiresAt,
+      id: parsed.id,
+      revokedAt: null,
+      scopes: parsed.scopes,
+      teams: parsed.teams,
+      token: parsed.token,
+    },
+  };
 }
 
 type RevokeResult = { error: "not_found" } | { revoked: RevokedToken };
 
-export async function revokeToken(env: Env, tokenId: string, now = new Date()): Promise<RevokeResult | null> {
-	if (env.TOKEN_DB === undefined) {
-		return null;
-	}
+export async function revokeToken(
+  env: Env,
+  tokenId: string,
+  now = new Date(),
+): Promise<RevokeResult | null> {
+  if (env.TOKEN_DB === undefined) {
+    return null;
+  }
 
-	const revokedAt = now.toISOString();
-	const result = await env.TOKEN_DB.prepare(REVOKE_TOKEN_QUERY).bind(revokedAt, tokenId).run();
-	if (result.meta?.changes === 0) {
-		return { error: "not_found" };
-	}
-	await auditTokenAction(env, tokenId, "revoke", now);
-	return { revoked: { id: tokenId, revokedAt } };
+  const revokedAt = now.toISOString();
+  const statement = env.TOKEN_DB.prepare(REVOKE_TOKEN_QUERY);
+  const boundStatement = statement.bind(revokedAt, tokenId);
+  const result = await boundStatement.run();
+  if (result.meta?.changes === 0) {
+    return { error: "not_found" };
+  }
+  await auditTokenAction(env, tokenId, "revoke", now);
+  return { revoked: { id: tokenId, revokedAt } };
 }
 
-async function auditTokenAction(env: Env, tokenId: string, action: "create" | "revoke", now = new Date()): Promise<void> {
-	await env.TOKEN_DB?.prepare(INSERT_AUDIT_QUERY).bind(crypto.randomUUID(), tokenId, action, now.toISOString()).run();
+async function auditTokenAction(
+  env: Env,
+  tokenId: string,
+  action: "create" | "revoke",
+  now = new Date(),
+): Promise<void> {
+  const auditId = crypto.randomUUID();
+  const createdAt = now.toISOString();
+  const statement = env.TOKEN_DB?.prepare(INSERT_AUDIT_QUERY);
+  const boundStatement = statement?.bind(auditId, tokenId, action, createdAt);
+  await boundStatement?.run();
 }
 
 function parseCreateToken(input: CreateTokenInput): Omit<CreatedToken, "revokedAt"> | string {
-	const id = input.id === undefined ? `tok_${crypto.randomUUID()}` : parseId(input.id);
-	const token = input.token === undefined ? generatedToken() : parseRawToken(input.token);
-	const teams = parseTeamKeys(input.teams);
-	const scopes = parseAuthScopes(input.scopes);
-	const expiresAt = parseExpiresAt(input.expiresAt);
+  let id: string | null;
+  if (input.id === undefined) {
+    const generatedId = crypto.randomUUID();
+    id = `tok_${generatedId}`;
+  } else {
+    id = parseId(input.id);
+  }
 
-	if (id === null) {
-		return "id must contain only letters, numbers, dots, underscores, colons, or dashes";
-	}
+  let token: string | null;
+  if (input.token === undefined) {
+    token = generatedToken();
+  } else {
+    token = parseRawToken(input.token);
+  }
+  const teams = parseTeamKeys(input.teams);
+  const scopes = parseAuthScopes(input.scopes);
+  const expiresAt = parseExpiresAt(input.expiresAt);
 
-	if (token === null) {
-		return "token must be a non-empty string no longer than 512 characters";
-	}
+  if (id === null) {
+    return "id must contain only letters, numbers, dots, underscores, colons, or dashes";
+  }
 
-	if (teams.length === 0) {
-		return "teams must be a non-empty string array";
-	}
+  if (token === null) {
+    return "token must be a non-empty string no longer than 512 characters";
+  }
 
-	if (scopes.length === 0) {
-		return "scopes must include read or write";
-	}
+  if (teams.length === 0) {
+    return "teams must be a non-empty string array";
+  }
 
-	if (expiresAt === false) {
-		return "expiresAt must be an ISO timestamp";
-	}
+  if (scopes.length === 0) {
+    return "scopes must include read or write";
+  }
 
-	return { expiresAt, id, scopes, teams, token };
+  if (expiresAt === false) {
+    return "expiresAt must be an ISO timestamp";
+  }
+
+  return { expiresAt, id, scopes, teams, token };
 }
 
-function tokenRecord(row: TokenRow): TokenRecord {
-	return {
-		expiresAt: row.expires_at ?? null,
-		id: row.id,
-		revokedAt: row.revoked_at ?? null,
-		scopes: parseAuthScopesJson(row.scopes),
-		teams: parseTeamKeysJson(row.teams),
-	};
+function isUniqueConstraintError(error: unknown): boolean {
+  return error instanceof Error && /unique|constraint/i.test(error.message);
+}
+
+function tokenRecord(row: D1TokenRow): TokenRecord {
+  const scopes = parseAuthScopesJson(row.scopes);
+  const teams = parseTeamKeysJson(row.teams);
+  return {
+    expiresAt: row.expires_at ?? null,
+    id: row.id,
+    revokedAt: row.revoked_at ?? null,
+    scopes,
+    teams,
+  };
 }
 
 function parseId(value: unknown): string | null {
-	return typeof value === "string" && /^[A-Za-z0-9._:-]{1,128}$/.test(value) ? value : null;
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const isValid = /^[A-Za-z0-9._:-]{1,128}$/.test(value);
+  return isValid ? value : null;
 }
 
 function parseRawToken(value: unknown): string | null {
-	return typeof value === "string" && value.length > 0 && value.length <= MAX_BEARER_TOKEN_LENGTH ? value : null;
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const isValid = value.length > 0 && value.length <= MAX_BEARER_TOKEN_LENGTH;
+  return isValid ? value : null;
 }
 
 function parseExpiresAt(value: unknown): string | null | false {
-	if (value === undefined || value === null) {
-		return null;
-	}
+  if (value === undefined || value === null) {
+    return null;
+  }
 
-	if (typeof value !== "string") {
-		return false;
-	}
+  if (typeof value !== "string") {
+    return false;
+  }
 
-	const time = Date.parse(value);
-	return Number.isFinite(time) ? new Date(time).toISOString() : false;
+  const time = Date.parse(value);
+  if (!Number.isFinite(time)) {
+    return false;
+  }
+
+  const expiresAt = new Date(time);
+  return expiresAt.toISOString();
 }
 
 function generatedToken(): string {
-	const bytes = new Uint8Array(32);
-	crypto.getRandomValues(bytes);
-	return `tf_${base64UrlBytes(bytes)}`;
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  const encodedBytes = base64UrlBytes(bytes);
+  return `tf_${encodedBytes}`;
 }

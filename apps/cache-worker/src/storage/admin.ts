@@ -5,52 +5,64 @@ import { teamKeyPrefix } from "./keys";
 import { listStoredArtifacts } from "./list";
 
 interface TeamStats {
-	bytes: number;
-	objects: number;
-	team: string;
+  bytes: number;
+  objects: number;
+  team: string;
 }
 
 interface PurgeResult {
-	deleted: number;
-	team: string;
+  deleted: number;
+  team: string;
+  truncated: boolean;
 }
 
 const PAGE_LIMIT = 1000;
 
 export async function teamStats(env: Env, team: string): Promise<TeamStats> {
-	let cursor: string | undefined;
-	let bytes = 0;
-	let objects = 0;
+  let cursor: string | undefined;
+  let bytes = 0;
+  let objects = 0;
 
-	do {
-		const listed = await listStoredArtifacts(env, teamKeyPrefix(team), cursor, PAGE_LIMIT);
-		for (const object of listed.objects) {
-			bytes += object.size;
-			objects += 1;
-		}
+  do {
+    const prefix = teamKeyPrefix(team);
+    const listed = await listStoredArtifacts(env, prefix, cursor, PAGE_LIMIT);
+    for (const object of listed.objects) {
+      bytes += object.size;
+      objects += 1;
+    }
 
-		cursor = listed.truncated ? listed.cursor : undefined;
-	} while (cursor !== undefined);
+    cursor = listed.truncated ? listed.cursor : undefined;
+  } while (cursor !== undefined);
 
-	return { bytes, objects, team };
+  return { bytes, objects, team };
 }
 
-export async function purgeTeam(env: Env, team: string, maxDelete = PAGE_LIMIT): Promise<PurgeResult> {
-	let cursor: string | undefined;
-	let deleted = 0;
+export async function purgeTeam(
+  env: Env,
+  team: string,
+  maxDelete = Number.MAX_SAFE_INTEGER,
+): Promise<PurgeResult> {
+  let cursor: string | undefined;
+  let deleted = 0;
+  let truncated = false;
 
-	do {
-		const listed = await listStoredArtifacts(env, teamKeyPrefix(team), cursor, PAGE_LIMIT);
-		const selected = listed.objects.map((object) => object.key).slice(0, maxDelete - deleted);
+  do {
+    const prefix = teamKeyPrefix(team);
+    const listed = await listStoredArtifacts(env, prefix, cursor, PAGE_LIMIT);
+    const objectKeys = listed.objects.map((object) => object.key);
+    const remainingDeleteBudget = maxDelete - deleted;
+    const selected = objectKeys.slice(0, remainingDeleteBudget);
 
-		if (selected.length > 0) {
-			await deleteStoredArtifacts(env, selected);
-			await deleteIndexedArtifacts(env, selected);
-			deleted += selected.length;
-		}
+    if (selected.length > 0) {
+      const deletedKeys = await deleteStoredArtifacts(env, selected);
+      await deleteIndexedArtifacts(env, deletedKeys);
+      deleted += deletedKeys.length;
+    }
 
-		cursor = listed.truncated && deleted < maxDelete ? listed.cursor : undefined;
-	} while (cursor !== undefined);
+    truncated =
+      selected.length < listed.objects.length || (listed.truncated && deleted >= maxDelete);
+    cursor = listed.truncated && deleted < maxDelete ? listed.cursor : undefined;
+  } while (cursor !== undefined);
 
-	return { deleted, team };
+  return { deleted, team, truncated };
 }
