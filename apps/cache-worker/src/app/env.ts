@@ -75,7 +75,8 @@ export function appConfig(env: Env): AppConfig {
 
   const retentionDays = numberValue(env.RETENTION_DAYS, DEFAULT_RETENTION_DAYS);
   cachedConfig = {
-    artifactStore: artifactStore(env.ARTIFACT_STORE),
+    artifactStore:
+      env.ARTIFACT_STORE?.toLowerCase() === ArtifactStore.Kv ? ArtifactStore.Kv : ArtifactStore.R2,
     branchCachePolicy: branchCachePolicy(env.BRANCH_CACHE_POLICY),
     branchRetentionDays: numberValue(env.BRANCH_RETENTION_DAYS, retentionDays),
     cacheApiMaxBytes: numberValue(env.CACHE_API_MAX_BYTES, DEFAULT_CACHE_API_MAX_BYTES),
@@ -94,10 +95,6 @@ export function appConfig(env: Env): AppConfig {
   };
   cachedConfigKey = key;
   return cachedConfig;
-}
-
-function artifactStore(value: string | undefined): ArtifactStore {
-  return value?.toLowerCase() === ArtifactStore.Kv ? ArtifactStore.Kv : ArtifactStore.R2;
 }
 
 function branchCachePolicy(value: string | undefined): BranchCachePolicy {

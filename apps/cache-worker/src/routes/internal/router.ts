@@ -1,4 +1,4 @@
-import { HttpMethod } from "@turboflare/protocol";
+import { HttpMethod, RoutePath, RoutePrefix } from "@turboflare/protocol";
 
 import type { Env } from "../../app/env";
 import { requireInternalAdmin } from "../../auth/internal";
@@ -9,16 +9,16 @@ import { handleInternalTokens } from "./tokens";
 
 export async function handleInternal(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
-  if (!url.pathname.startsWith("/internal/")) {
+  if (!url.pathname.startsWith(`${RoutePrefix.Internal}/`)) {
     return null;
   }
 
-  const adminError = requireInternalAdmin(request, env);
+  const adminError = await requireInternalAdmin(request, env);
   if (adminError !== null) {
     return adminError;
   }
 
-  if (url.pathname === "/internal/health") {
+  if (url.pathname === RoutePath.InternalHealth) {
     return request.method === HttpMethod.Get
       ? new Response(null, { status: 200 })
       : methodNotAllowed([HttpMethod.Get]);

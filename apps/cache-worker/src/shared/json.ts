@@ -62,10 +62,10 @@ export async function readBoundedBytes(
   const chunks: Uint8Array[] = [];
   let bytes = 0;
 
-  while (true) {
+  async function readChunk(): Promise<BoundedBytesResult | undefined> {
     const { done, value } = await reader.read();
     if (done) {
-      break;
+      return undefined;
     }
 
     bytes += value.byteLength;
@@ -75,6 +75,12 @@ export async function readBoundedBytes(
     }
 
     chunks.push(value);
+    return readChunk();
+  }
+
+  const earlyResult = await readChunk();
+  if (earlyResult !== undefined) {
+    return earlyResult;
   }
 
   const buffer = new Uint8Array(bytes);

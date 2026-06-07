@@ -1,5 +1,5 @@
 import { appConfig, type Env } from "../app/env";
-import { deleteStoredArtifacts } from "./artifacts";
+import { deleteStoredArtifacts } from "./artifact-delete";
 import { ARTIFACT_NAMESPACE_VERSION } from "./constants";
 import { deleteIndexedArtifacts } from "./artifact-index";
 import { listStoredArtifacts } from "./list";
@@ -23,16 +23,16 @@ export async function cleanupExpiredArtifacts(env: Env, now?: number): Promise<C
     config.branchRetentionDays === 0
       ? new Date(0)
       : new Date(cleanupTime - config.branchRetentionDays * MS_PER_DAY);
-  let cursor: string | undefined;
   let deleted = 0;
   let scanned = 0;
 
-  do {
+  async function cleanupPage(cursor?: string): Promise<void> {
     const listed = await listStoredArtifacts(env, `${ARTIFACT_NAMESPACE_VERSION}/`, cursor);
     const expired = listed.objects
       .filter(
         (object) =>
-          object.uploaded < expiresBefore(object.key, artifactExpiresBefore, branchExpiresBefore),
+          object.uploaded <
+          (object.key.includes("/branch/") ? branchExpiresBefore : artifactExpiresBefore),
       )
       .map((object) => object.key);
     const remaining = config.cleanupMaxDelete - deleted;
@@ -46,12 +46,11 @@ export async function cleanupExpiredArtifacts(env: Env, now?: number): Promise<C
       deleted += deletedKeys.length;
     }
 
-    cursor = listed.truncated && deleted < config.cleanupMaxDelete ? listed.cursor : undefined;
-  } while (cursor !== undefined);
+    if (listed.truncated && deleted < config.cleanupMaxDelete && listed.cursor !== undefined) {
+      await cleanupPage(listed.cursor);
+    }
+  }
+  await cleanupPage();
 
   return { deleted, scanned };
-}
-
-function expiresBefore(key: string, artifactExpiresBefore: Date, branchExpiresBefore: Date): Date {
-  return key.includes("/branch/") ? branchExpiresBefore : artifactExpiresBefore;
 }

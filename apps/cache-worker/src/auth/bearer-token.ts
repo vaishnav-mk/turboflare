@@ -17,16 +17,3 @@ export function readBearerToken(request: Request): string | null {
 
   return token;
 }
-
-export function timingSafeEqual(left: string, right: string): boolean {
-  const length = Math.max(left.length, right.length);
-  let diff = left.length ^ right.length;
-
-  for (let index = 0; index < length; index += 1) {
-    const leftCode = index < left.length ? left.charCodeAt(index) : 0;
-    const rightCode = index < right.length ? right.charCodeAt(index) : 0;
-    diff |= leftCode ^ rightCode;
-  }
-
-  return diff === 0;
-}

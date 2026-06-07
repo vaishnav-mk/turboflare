@@ -1,11 +1,12 @@
-import { HttpMethod } from "@turboflare/protocol";
+import { HttpMethod, RouteAction, RoutePath } from "@turboflare/protocol";
 
 import type { Env } from "../../app/env";
 import { ErrorCode, errorResponse, jsonResponse, methodNotAllowed } from "../../http/response";
 import { readBoundedJson } from "../../shared/json";
 import { createToken, listTokens, revokeToken } from "../../storage/tokens";
 
-const TOKEN_ROUTE = /^\/internal\/tokens(?:\/([^/]+)\/revoke)?$/;
+const TOKEN_ROUTE = new RegExp(`^${RoutePath.InternalTokens}(?:/([^/]+)/${RouteAction.Revoke})?$`);
+const TOKEN_DB_MISSING = "Token database is not configured";
 
 export async function handleInternalTokens(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
@@ -22,7 +23,7 @@ export async function handleInternalTokens(request: Request, env: Env): Promise<
 
     const result = await revokeToken(env, tokenId);
     if (result === null) {
-      return tokenDbMissing();
+      return errorResponse(503, ErrorCode.Unavailable, TOKEN_DB_MISSING);
     }
     if ("error" in result) {
       return errorResponse(404, ErrorCode.NotFound, "Token not found or already revoked");
@@ -33,7 +34,7 @@ export async function handleInternalTokens(request: Request, env: Env): Promise<
   if (request.method === HttpMethod.Get) {
     const tokens = await listTokens(env);
     if (tokens === null) {
-      return tokenDbMissing();
+      return errorResponse(503, ErrorCode.Unavailable, TOKEN_DB_MISSING);
     }
 
     return jsonResponse({ tokens });
@@ -47,7 +48,7 @@ export async function handleInternalTokens(request: Request, env: Env): Promise<
 
     const created = await createToken(env, body);
     if (created === null) {
-      return tokenDbMissing();
+      return errorResponse(503, ErrorCode.Unavailable, TOKEN_DB_MISSING);
     }
 
     if ("error" in created) {
@@ -79,8 +80,4 @@ async function requestJson(request: Request): Promise<Record<string, unknown> | 
   } catch {
     return {};
   }
-}
-
-function tokenDbMissing(): Response {
-  return errorResponse(503, ErrorCode.Unavailable, "Token database is not configured");
 }

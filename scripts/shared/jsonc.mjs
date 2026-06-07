@@ -8,9 +8,7 @@ export function stripJsonComments(value) {
     const next = value[index + 1];
 
     if (!inString && character === "/" && next === "/") {
-      while (index < value.length && value[index] !== "\n") {
-        index += 1;
-      }
+      for (; index < value.length && value[index] !== "\n"; index += 1) {}
       output += value[index] ?? "";
       continue;
     }
@@ -61,9 +59,7 @@ function stripTrailingCommas(value) {
 
     if (!inString && character === ",") {
       let nextIndex = index + 1;
-      while (/\s/.test(value[nextIndex] ?? "")) {
-        nextIndex += 1;
-      }
+      for (; /\s/.test(value[nextIndex] ?? ""); nextIndex += 1) {}
       if (value[nextIndex] === "}" || value[nextIndex] === "]") {
         continue;
       }

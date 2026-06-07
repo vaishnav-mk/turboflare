@@ -1,6 +1,5 @@
 import type { Env } from "../app/env";
 import { MAX_BEARER_TOKEN_LENGTH } from "../auth/constants";
-import { hashToken } from "../auth/d1";
 import {
   parseAuthScopes,
   parseAuthScopesJson,
@@ -9,6 +8,7 @@ import {
 } from "../auth/token-fields";
 import { AuthScope, type D1TokenRow } from "../auth/types";
 import { base64UrlBytes } from "../shared/base64";
+import { sha256Hex } from "../shared/hash";
 
 interface TokenRecord {
   expiresAt: string | null;
@@ -67,7 +67,7 @@ export async function createToken(env: Env, input: CreateTokenInput): Promise<To
     return { error: parsed };
   }
 
-  const tokenHash = await hashToken(parsed.token);
+  const tokenHash = await sha256Hex(parsed.token);
   const teams = JSON.stringify(parsed.teams);
   const scopes = JSON.stringify(parsed.scopes);
   const statement = env.TOKEN_DB.prepare(CREATE_TOKEN_QUERY);

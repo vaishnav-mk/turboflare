@@ -1,15 +1,12 @@
-import { HttpMethod } from "@turboflare/protocol";
+import { HttpMethod, RouteAction, RoutePath } from "@turboflare/protocol";
 
 import type { Env } from "../../app/env";
 import { jsonResponse, methodNotAllowed } from "../../http/response";
 import { purgeTeam, teamStats } from "../../storage/admin";
 
-enum InternalTeamAction {
-  PurgeAll = "purge-all",
-  Stats = "stats",
-}
-
-const TEAM_ROUTE = /^\/internal\/teams\/([^/]+)\/(stats|purge-all)$/;
+const TEAM_ROUTE = new RegExp(
+  `^${RoutePath.InternalTeams}/([^/]+)/(${RouteAction.Stats}|${RouteAction.PurgeAll})$`,
+);
 
 export async function handleInternalTeam(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
@@ -21,7 +18,7 @@ export async function handleInternalTeam(request: Request, env: Env): Promise<Re
   const team = decodeURIComponent(match[1]);
   const action = match[2];
 
-  if (action === InternalTeamAction.Stats) {
+  if (action === RouteAction.Stats) {
     if (request.method !== HttpMethod.Get) {
       return methodNotAllowed([HttpMethod.Get]);
     }

@@ -1,9 +1,10 @@
 import type { Env } from "../app/env";
-import { readBearerToken, timingSafeEqual } from "./bearer-token";
+import { sha256Hex } from "../shared/hash";
+import { readBearerToken } from "./bearer-token";
 import { ALL_TEAMS, MAX_BEARER_TOKEN_LENGTH } from "./constants";
 import { authenticateD1Token } from "./d1";
 import { parseAllowedTokens, parseScopedTokens } from "./static";
-import { type AuthContext, AuthScope, type StaticTokenRule } from "./types";
+import { type AuthContext, type StaticTokenRule } from "./types";
 
 let cachedRawTokens: string | undefined;
 let cachedRawScopedTokens: string | undefined;
@@ -19,7 +20,7 @@ export async function authenticateBearer(request: Request, env: Env): Promise<Au
   }
 
   const rules = tokenRules(env);
-  const rule = matchingTokenRule(token, rules);
+  const rule = await matchingTokenRule(token, rules);
   if (rule !== undefined) {
     return {
       allowedTeams: rule.teams,
@@ -29,10 +30,6 @@ export async function authenticateBearer(request: Request, env: Env): Promise<Au
   }
 
   return authenticateD1Token(env, token);
-}
-
-export function hasScope(authContext: AuthContext, scope: AuthScope): boolean {
-  return authContext.scopes.includes(scope);
 }
 
 export function canAccessTeam(authContext: AuthContext, teamKey: string): boolean {
@@ -55,12 +52,14 @@ function tokenRules(env: Env): readonly StaticTokenRule[] {
   return cachedTokenRules;
 }
 
-function matchingTokenRule(
+async function matchingTokenRule(
   token: string,
   rules: readonly StaticTokenRule[],
-): StaticTokenRule | undefined {
+): Promise<StaticTokenRule | undefined> {
+  const tokenHash = await sha256Hex(token);
   for (const rule of rules) {
-    if (timingSafeEqual(token, rule.token)) {
+    const ruleHash = await sha256Hex(rule.token);
+    if (tokenHash === ruleHash) {
       return rule;
     }
   }

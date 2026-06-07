@@ -3,11 +3,12 @@ import {
   ARTIFACT_STATUS_PATH,
   ARTIFACTS_PATH,
   HttpMethod,
+  RoutePath,
   TURBO_API_PREFIX,
 } from "@turboflare/protocol";
 
 import type { Env } from "./env";
-import { authenticateBearer, canAccessTeam, hasScope } from "../auth/bearer";
+import { authenticateBearer, canAccessTeam } from "../auth/bearer";
 import { AuthScope, type AuthContext } from "../auth/types";
 import { ErrorCode, errorResponse } from "../http/response";
 import { recordMetric } from "../observability/metrics";
@@ -63,7 +64,7 @@ export async function handleRequest(
     return compat;
   }
 
-  if (!isTurboPath(state.url.pathname)) {
+  if (!state.url.pathname.startsWith(`${TURBO_API_PREFIX}/`)) {
     return errorResponse(404, ErrorCode.NotFound, "Not found");
   }
 
@@ -71,19 +72,20 @@ export async function handleRequest(
 }
 
 function handlePublicRoute({ request, url }: RequestState): Response | null {
-  if (request.method === HttpMethod.Get && url.pathname === "/") {
-    return new Response("Turboflare remote cache\n", {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-      },
-    });
+  if (request.method !== HttpMethod.Get) {
+    return null;
   }
 
-  if (request.method === HttpMethod.Get && url.pathname === "/management/health") {
-    return new Response(null, { status: 200 });
+  switch (url.pathname) {
+    case RoutePath.Root:
+      return new Response("Turboflare remote cache\n", {
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
+    case RoutePath.ManagementHealth:
+      return new Response(null, { status: 200 });
+    default:
+      return null;
   }
-
-  return null;
 }
 
 async function handleTurboRoute(state: RequestState): Promise<Response> {
@@ -112,7 +114,7 @@ async function handleTurboRoute(state: RequestState): Promise<Response> {
     tenantState.tenant,
   );
   if (rateLimitError !== null) {
-    return protocolResponse(rateLimitError);
+    return withProtocolHeaders(rateLimitError);
   }
 
   return handleTenantRoute(tenantState);
@@ -131,7 +133,7 @@ async function authenticateTurbo(state: RequestState): Promise<AuthenticatedStat
   const { env, request } = state;
   const authContext = await authenticateBearer(request, env);
   if (authContext === null) {
-    return protocolResponse(
+    return withProtocolHeaders(
       errorResponse(401, ErrorCode.Unauthorized, "Missing or invalid bearer token", {
         "WWW-Authenticate": "Bearer",
       }),
@@ -139,13 +141,13 @@ async function authenticateTurbo(state: RequestState): Promise<AuthenticatedStat
   }
 
   const requiredScope = request.method === HttpMethod.Put ? AuthScope.Write : AuthScope.Read;
-  if (!hasScope(authContext, requiredScope)) {
+  if (!authContext.scopes.includes(requiredScope)) {
     const response = errorResponse(
       403,
       ErrorCode.Forbidden,
       "Token does not have the required scope",
     );
-    return protocolResponse(response);
+    return withProtocolHeaders(response);
   }
 
   return { ...state, authContext };
@@ -158,11 +160,11 @@ async function handleStatusRoute({
 }: AuthenticatedState): Promise<Response> {
   const rateLimitError = await enforceRateLimit(env, authContext, null);
   if (rateLimitError !== null) {
-    return protocolResponse(rateLimitError);
+    return withProtocolHeaders(rateLimitError);
   }
 
   const response = handleStatus(request, env);
-  return protocolResponse(response);
+  return withProtocolHeaders(response);
 }
 
 function authorizeTenant(state: AuthenticatedState): TenantState | Response {
@@ -170,7 +172,7 @@ function authorizeTenant(state: AuthenticatedState): TenantState | Response {
   const tenant = resolveTenant(request, env);
   if (!canAccessTeam(authContext, tenant.key)) {
     const response = errorResponse(403, ErrorCode.Forbidden, "Token cannot access this team");
-    return protocolResponse(response);
+    return withProtocolHeaders(response);
   }
 
   return { ...state, tenant };
@@ -181,30 +183,22 @@ async function handleTenantRoute(state: TenantState): Promise<Response> {
 
   if (url.pathname === ARTIFACT_EVENTS_PATH) {
     const response = await handleEvents(request, env);
-    return protocolResponse(response);
+    return withProtocolHeaders(response);
   }
 
   if (url.pathname === ARTIFACTS_PATH || url.pathname === `${ARTIFACTS_PATH}/`) {
     const response = await handleArtifactLookup(request, env, tenant);
-    return protocolResponse(response);
+    return withProtocolHeaders(response);
   }
 
   const artifactId = parseArtifactId(url.pathname);
   if (artifactId === null) {
     const response = errorResponse(404, ErrorCode.NotFound, "Not found");
-    return protocolResponse(response);
+    return withProtocolHeaders(response);
   }
 
   const response = await handleArtifact(request, env, ctx, tenant, artifactId, authContext);
-  return protocolResponse(response);
-}
-
-function protocolResponse(response: Response): Response {
   return withProtocolHeaders(response);
-}
-
-function isTurboPath(pathname: string): boolean {
-  return pathname.startsWith(`${TURBO_API_PREFIX}/`);
 }
 
 function parseArtifactId(pathname: string): string | null {

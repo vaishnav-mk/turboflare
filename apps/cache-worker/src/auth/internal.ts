@@ -1,8 +1,9 @@
 import { appConfig, type Env } from "../app/env";
 import { ErrorCode, errorResponse } from "../http/response";
-import { readBearerToken, timingSafeEqual } from "./bearer-token";
+import { sha256Hex } from "../shared/hash";
+import { readBearerToken } from "./bearer-token";
 
-export function requireInternalAdmin(request: Request, env: Env): Response | null {
+export async function requireInternalAdmin(request: Request, env: Env): Promise<Response | null> {
   const token = appConfig(env).internalAdminToken;
   if (token === undefined) {
     return errorResponse(503, ErrorCode.Unavailable, "Internal admin token is not configured");
@@ -15,7 +16,9 @@ export function requireInternalAdmin(request: Request, env: Env): Response | nul
     });
   }
 
-  return timingSafeEqual(received, token)
+  const receivedHash = await sha256Hex(received);
+  const tokenHash = await sha256Hex(token);
+  return receivedHash === tokenHash
     ? null
     : errorResponse(403, ErrorCode.Forbidden, "Invalid internal admin token");
 }

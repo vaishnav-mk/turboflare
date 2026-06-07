@@ -100,11 +100,12 @@ async function loadHighlighter() {
 
 async function highlightCodeBlocks(html) {
   const regex = /<pre><code(?:\s+class="language-([^"]*)")?>([\s\S]*?)<\/code><\/pre>/g;
-  const matches = [];
-  let m;
-  while ((m = regex.exec(html)) !== null) {
-    matches.push({ full: m[0], lang: m[1] || "", code: m[2], index: m.index });
-  }
+  const matches = [...html.matchAll(regex)].map((match) => ({
+    full: match[0],
+    lang: match[1] || "",
+    code: match[2],
+    index: match.index,
+  }));
   if (matches.length === 0) return html;
 
   const results = await Promise.all(
@@ -179,13 +180,11 @@ function headings(markdown) {
 }
 
 function fencedRanges(markdown) {
-  const ranges = [];
   const regex = /```[\s\S]*?```/g;
-  let match;
-  while ((match = regex.exec(markdown)) !== null) {
-    ranges.push({ start: match.index, end: match.index + match[0].length });
-  }
-  return ranges;
+  return [...markdown.matchAll(regex)].map((match) => ({
+    start: match.index,
+    end: match.index + match[0].length,
+  }));
 }
 
 function withHeadingIds(html, toc) {

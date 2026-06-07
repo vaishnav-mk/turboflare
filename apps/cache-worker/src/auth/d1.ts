@@ -15,7 +15,7 @@ export async function authenticateD1Token(
     return null;
   }
 
-  const tokenHash = await hashToken(token);
+  const tokenHash = await sha256Hex(token);
   const statement = env.TOKEN_DB.prepare(TOKEN_HASH_QUERY);
   const boundStatement = statement.bind(tokenHash);
   const row = await boundStatement.first<D1TokenRow>();
@@ -34,10 +34,6 @@ export async function authenticateD1Token(
   }
 
   return { allowedTeams, scopes, tokenId: row.id };
-}
-
-export async function hashToken(token: string): Promise<string> {
-  return sha256Hex(token);
 }
 
 function isExpired(value: string | null | undefined, now: number): boolean {

@@ -28,16 +28,11 @@ export async function deleteCachedArtifacts(keys: readonly string[]): Promise<vo
 export function cacheableResponse(response: Response, key: string): Response {
   const headers = new Headers(response.headers);
   headers.set("Cache-Control", "public, max-age=31536000, immutable");
-  const tag = cacheTag(key);
-  headers.set("Cache-Tag", tag);
+  headers.set("Cache-Tag", `artifact:${key}`.replaceAll("/", ":"));
   headers.set("Access-Control-Expose-Headers", EXPOSED_ARTIFACT_HEADERS);
   return new Response(response.body, {
     headers,
     status: response.status,
     statusText: response.statusText,
   });
-}
-
-function cacheTag(key: string): string {
-  return `artifact:${key}`.replaceAll("/", ":");
 }

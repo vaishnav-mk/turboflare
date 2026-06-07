@@ -7,10 +7,11 @@ import {
   ARTIFACT_EVENTS_PATH,
   ARTIFACT_STATUS_PATH,
   CacheStatus,
+  RoutePath,
 } from "@turboflare/protocol";
 
 import { handleRequest, type Env } from "../src";
-import { hashToken } from "../src/auth/d1";
+import { sha256Hex } from "../src/shared/hash";
 import { artifactCache, cacheRequest } from "../src/storage/cache-api";
 import { daysAgo } from "./helpers/time";
 
@@ -164,7 +165,7 @@ describe("cache worker", () => {
         token: "raw-token",
       },
     });
-    const rawTokenHash = await hashToken("raw-token");
+    const rawTokenHash = await sha256Hex("raw-token");
     expect(tokenDb.rows.get("ci-token")?.token_hash).toBe(rawTokenHash);
     expect(tokenDb.audit.map((row) => [row.action, row.token_id])).toEqual([
       ["create", "ci-token"],
@@ -288,7 +289,7 @@ describe("cache worker", () => {
   });
 
   it("serves Turbo user and team compatibility metadata", async ({ expect }) => {
-    const user = await fetchAuthed("/v2/user");
+    const user = await fetchAuthed(RoutePath.TurboIdentityUser);
     expect(user.status).toBe(200);
     expect(await user.json()).toEqual({
       user: {
@@ -300,7 +301,7 @@ describe("cache worker", () => {
     });
 
     const teams = await handleRequest(
-      new Request(`${BASE_URL}/v2/teams`, {
+      new Request(`${BASE_URL}${RoutePath.TurboIdentityTeams}`, {
         headers: { Authorization: `Bearer ${SCOPED_WRITE_TOKEN}` },
       }),
       scopedEnv(),
@@ -321,7 +322,7 @@ describe("cache worker", () => {
     });
 
     const team = await handleRequest(
-      new Request(`${BASE_URL}/v2/teams/${TEAM_ID}`, {
+      new Request(`${BASE_URL}${RoutePath.TurboIdentityTeams}/${TEAM_ID}`, {
         headers: { Authorization: `Bearer ${SCOPED_WRITE_TOKEN}` },
       }),
       scopedEnv(),
@@ -333,7 +334,7 @@ describe("cache worker", () => {
 
   it("rejects compatibility metadata for unauthorized teams", async ({ expect }) => {
     const response = await handleRequest(
-      new Request(`${BASE_URL}/v2/teams/${OTHER_TEAM_ID}`, {
+      new Request(`${BASE_URL}${RoutePath.TurboIdentityTeams}/${OTHER_TEAM_ID}`, {
         headers: { Authorization: `Bearer ${SCOPED_WRITE_TOKEN}` },
       }),
       scopedEnv(),

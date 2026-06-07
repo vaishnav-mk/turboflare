@@ -81,9 +81,9 @@ function run(id, command, args, env = {}) {
       const durationMs = Math.round(performance.now() - started);
       const endedAt = new Date().toISOString();
       const phase = {
-        cacheHits: countMatches(stdout, /cache hit/gi),
-        cacheMisses: countMatches(stdout, /cache miss/gi),
-        cacheBypasses: countMatches(stdout, /cache bypass/gi),
+        cacheHits: stdout.match(/cache hit/gi)?.length ?? 0,
+        cacheMisses: stdout.match(/cache miss/gi)?.length ?? 0,
+        cacheBypasses: stdout.match(/cache bypass/gi)?.length ?? 0,
         command: `${command} ${args.join(" ")}`,
         durationMs,
         endedAt,
@@ -144,7 +144,7 @@ function markdownSummary(phases) {
 
   for (const phase of phases) {
     lines.push(
-      `| ${phase.id} | ${phase.exitCode === 0 ? "pass" : "fail"} | ${formatDuration(phase.durationMs)} | ${phase.cacheHits} | ${phase.cacheMisses} | ${phase.cacheBypasses} |`,
+      `| ${phase.id} | ${phase.exitCode === 0 ? "pass" : "fail"} | ${(phase.durationMs / 1000).toFixed(2)}s | ${phase.cacheHits} | ${phase.cacheMisses} | ${phase.cacheBypasses} |`,
     );
   }
 
@@ -154,10 +154,6 @@ function markdownSummary(phases) {
     "",
   );
   return `${lines.join("\n")}\n`;
-}
-
-function countMatches(value, pattern) {
-  return value.match(pattern)?.length ?? 0;
 }
 
 function tail(text) {
@@ -184,8 +180,4 @@ function stripAnsi(text) {
     output += character;
   }
   return output;
-}
-
-function formatDuration(durationMs) {
-  return `${(durationMs / 1000).toFixed(2)}s`;
 }

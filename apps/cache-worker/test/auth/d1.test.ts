@@ -1,8 +1,9 @@
 import { describe, it } from "vitest";
 
-import { authenticateD1Token, hashToken } from "../../src/auth/d1";
+import { authenticateD1Token } from "../../src/auth/d1";
 import { AuthScope } from "../../src/auth/types";
 import type { Env } from "../../src/app/env";
+import { sha256Hex } from "../../src/shared/hash";
 
 interface Row {
   expires_at?: string | null;
@@ -15,7 +16,7 @@ interface Row {
 describe("D1 token auth", () => {
   it("authenticates hashed token rows", async ({ expect }) => {
     const token = "d1-token";
-    const tokenHash = await hashToken(token);
+    const tokenHash = await sha256Hex(token);
     const env = tokenEnv({
       [tokenHash]: row({
         id: "db-token",
@@ -36,9 +37,9 @@ describe("D1 token auth", () => {
     const expired = "expired-token";
     const malformed = "malformed-expiry-token";
     const revoked = "revoked-token";
-    const expiredHash = await hashToken(expired);
-    const malformedHash = await hashToken(malformed);
-    const revokedHash = await hashToken(revoked);
+    const expiredHash = await sha256Hex(expired);
+    const malformedHash = await sha256Hex(malformed);
+    const revokedHash = await sha256Hex(revoked);
     const env = tokenEnv({
       [expiredHash]: row({
         expiresAt: "2020-01-01T00:00:00.000Z",
@@ -72,8 +73,8 @@ describe("D1 token auth", () => {
   it("rejects malformed scope and team rows", async ({ expect }) => {
     const badScopes = "bad-scopes";
     const badTeams = "bad-teams";
-    const badScopesHash = await hashToken(badScopes);
-    const badTeamsHash = await hashToken(badTeams);
+    const badScopesHash = await sha256Hex(badScopes);
+    const badTeamsHash = await sha256Hex(badTeams);
     const env = tokenEnv({
       [badScopesHash]: {
         expires_at: null,

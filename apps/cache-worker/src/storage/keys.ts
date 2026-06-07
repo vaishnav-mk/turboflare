@@ -33,7 +33,7 @@ export function fallbackArtifactKey(
 }
 
 export function teamKeyPrefix(team: string): string {
-  return `${ARTIFACT_NAMESPACE_VERSION}/team/${safeKeyPart(team)}/`;
+  return `${ARTIFACT_NAMESPACE_VERSION}/team/${encodeURIComponent(team)}/`;
 }
 
 function artifactKeyForBranch(
@@ -42,12 +42,8 @@ function artifactKeyForBranch(
   branch: string | undefined,
 ): string {
   const teamPrefix = teamKeyPrefix(tenant.key);
-  const artifactPart = `artifact/${safeKeyPart(artifactId)}`;
+  const artifactPart = `artifact/${encodeURIComponent(artifactId)}`;
   return branch === undefined
     ? `${teamPrefix}${artifactPart}`
-    : `${teamPrefix}branch/${safeKeyPart(branch)}/${artifactPart}`;
-}
-
-function safeKeyPart(value: string): string {
-  return encodeURIComponent(value);
+    : `${teamPrefix}branch/${encodeURIComponent(branch)}/${artifactPart}`;
 }

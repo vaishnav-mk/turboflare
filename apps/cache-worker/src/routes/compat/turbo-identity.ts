@@ -1,8 +1,8 @@
-import { HttpMethod } from "@turboflare/protocol";
+import { HttpMethod, RoutePath } from "@turboflare/protocol";
 
 import type { Env } from "../../app/env";
 import { ALL_TEAMS } from "../../auth/constants";
-import { authenticateBearer, canAccessTeam, hasScope } from "../../auth/bearer";
+import { authenticateBearer, canAccessTeam } from "../../auth/bearer";
 import { AuthScope, type AuthContext } from "../../auth/types";
 import { ErrorCode, errorResponse, jsonResponse, methodNotAllowed } from "../../http/response";
 
@@ -16,16 +16,18 @@ interface CompatTeam {
 }
 
 const DEFAULT_TEAM = "team_default";
-const TEAMS_PATH = "/v2/teams";
-const TEAM_ROUTE = /^\/v2\/teams\/([^/]+)$/;
-const USER_PATH = "/v2/user";
+const TEAM_ROUTE = new RegExp(`^${RoutePath.TurboIdentityTeams}/([^/]+)$`);
 
 export async function handleTurboIdentityCompatibility(
   request: Request,
   env: Env,
 ): Promise<Response | null> {
   const url = new URL(request.url);
-  if (url.pathname !== USER_PATH && url.pathname !== TEAMS_PATH && !TEAM_ROUTE.test(url.pathname)) {
+  if (
+    url.pathname !== RoutePath.TurboIdentityUser &&
+    url.pathname !== RoutePath.TurboIdentityTeams &&
+    !TEAM_ROUTE.test(url.pathname)
+  ) {
     return null;
   }
 
@@ -39,16 +41,16 @@ export async function handleTurboIdentityCompatibility(
       "WWW-Authenticate": "Bearer",
     });
   }
-  if (!hasScope(authContext, AuthScope.Read)) {
+  if (!authContext.scopes.includes(AuthScope.Read)) {
     return errorResponse(403, ErrorCode.Forbidden, "Token does not have the required scope");
   }
 
-  if (url.pathname === USER_PATH) {
+  if (url.pathname === RoutePath.TurboIdentityUser) {
     const user = compatUser(authContext);
     return jsonResponse({ user });
   }
 
-  if (url.pathname === TEAMS_PATH) {
+  if (url.pathname === RoutePath.TurboIdentityTeams) {
     const teams = compatTeams(authContext);
     return jsonResponse({ teams });
   }

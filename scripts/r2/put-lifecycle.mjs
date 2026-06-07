@@ -29,7 +29,7 @@ const body = {
         condition: { maxAge: retentionDays * SECONDS_PER_DAY, type: "Age" },
       },
       enabled: true,
-      id: `expire-turboflare-artifacts-after-${retentionDays}-${dayLabel(retentionDays)}`,
+      id: `expire-turboflare-artifacts-after-${retentionDays}-${retentionDays === 1 ? "day" : "days"}`,
     },
     {
       abortMultipartUploadsTransition: {
@@ -37,7 +37,7 @@ const body = {
       },
       conditions: { prefix: "v1/" },
       enabled: true,
-      id: `abort-turboflare-multipart-after-${abortMultipartDays}-${dayLabel(abortMultipartDays)}`,
+      id: `abort-turboflare-multipart-after-${abortMultipartDays}-${abortMultipartDays === 1 ? "day" : "days"}`,
     },
   ],
 };
@@ -77,8 +77,4 @@ function positiveInteger(value, name) {
   }
 
   return parsed;
-}
-
-function dayLabel(value) {
-  return value === 1 ? "day" : "days";
 }

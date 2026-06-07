@@ -24,7 +24,7 @@ async function createBucket(name) {
     return;
   }
 
-  if (bucketAlreadyExists(`${result.stdout}\n${result.stderr}`)) {
+  if (/already exists|bucket.*exists|already own/i.test(`${result.stdout}\n${result.stderr}`)) {
     console.log(`R2 bucket ${name} already exists`);
     return;
   }
@@ -51,8 +51,4 @@ function run(command, args, options = {}) {
       resolve(result);
     });
   });
-}
-
-function bucketAlreadyExists(output) {
-  return /already exists|bucket.*exists|already own/i.test(output);
 }

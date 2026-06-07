@@ -1,3 +1,10 @@
+import {
+  ARTIFACTS_PATH,
+  ARTIFACT_EVENTS_PATH,
+  ARTIFACT_STATUS_PATH,
+  RouteAction,
+  RoutePath,
+} from "../../packages/protocol/dist/index.js";
 import { requiredEnv } from "../shared/env.mjs";
 
 const r2Api = requiredEnv("TURBOFLARE_R2_API");
@@ -15,27 +22,27 @@ await check("r2 health", async () => {
 });
 
 await check("r2 rejects unauthenticated status", async () => {
-  const response = await fetch(`${r2Api}/v8/artifacts/status`);
+  const response = await fetch(`${r2Api}${ARTIFACT_STATUS_PATH}`);
   assertStatus(response, 401);
 });
 
 await check("r2 authenticated status", async () => {
-  const response = await authedFetch(`${r2Api}/v8/artifacts/status`);
+  const response = await authedFetch(`${r2Api}${ARTIFACT_STATUS_PATH}`);
   assertStatus(response, 200);
   const body = await response.json();
   assert(body.status === "enabled", `expected enabled status, got ${JSON.stringify(body)}`);
 });
 
 await check("r2 v2 compatibility", async () => {
-  const user = await authedFetch(`${r2Api}/v2/user`);
+  const user = await authedFetch(`${r2Api}${RoutePath.TurboIdentityUser}`);
   assertStatus(user, 200);
-  const teamResponse = await authedFetch(`${r2Api}/v2/teams/${encodedTeam}`);
+  const teamResponse = await authedFetch(`${r2Api}${RoutePath.TurboIdentityTeams}/${encodedTeam}`);
   assertStatus(teamResponse, 200);
 });
 
 await check("r2 preflight", async () => {
   const response = await fetch(
-    `${r2Api}/v8/artifacts/preflight-${Date.now()}?teamId=${encodedTeam}`,
+    `${r2Api}${ARTIFACTS_PATH}/preflight-${Date.now()}?teamId=${encodedTeam}`,
     {
       method: "OPTIONS",
     },
@@ -49,7 +56,7 @@ await check("r2 preflight", async () => {
 
 await check("r2 put head get lookup events", async () => {
   const id = `artifact-${Date.now()}`;
-  const path = `/v8/artifacts/${id}?teamId=${encodedTeam}`;
+  const path = `${ARTIFACTS_PATH}/${id}?teamId=${encodedTeam}`;
   const bytes = new TextEncoder().encode("hello-r2");
   const put = await putBytes(`${r2Api}${path}`, bytes, {
     "x-artifact-duration": "12",
@@ -66,7 +73,7 @@ await check("r2 put head get lookup events", async () => {
   const getText = await get.text();
   assertText(getText, "hello-r2");
 
-  const lookup = await authedFetch(`${r2Api}/v8/artifacts?teamId=${encodedTeam}`, {
+  const lookup = await authedFetch(`${r2Api}${ARTIFACTS_PATH}?teamId=${encodedTeam}`, {
     body: JSON.stringify({ hashes: [id, `missing-${id}`] }),
     headers: { "Content-Type": "application/json" },
     method: "POST",
@@ -78,7 +85,7 @@ await check("r2 put head get lookup events", async () => {
     `bad lookup ${JSON.stringify(lookupBody)}`,
   );
 
-  const events = await authedFetch(`${r2Api}/v8/artifacts/events`, {
+  const events = await authedFetch(`${r2Api}${ARTIFACT_EVENTS_PATH}`, {
     body: JSON.stringify([{ duration: 1, event: "HIT", hash: id, source: "REMOTE" }]),
     headers: { "Content-Type": "application/json" },
     method: "POST",
@@ -89,7 +96,7 @@ await check("r2 put head get lookup events", async () => {
 await check("r2 upload validation", async () => {
   const id = `validation-${Date.now()}`;
   const textUpload = await putBytes(
-    `${r2Api}/v8/artifacts/${id}?teamId=${encodedTeam}`,
+    `${r2Api}${ARTIFACTS_PATH}/${id}?teamId=${encodedTeam}`,
     new Uint8Array([1]),
     {
       "Content-Type": "text/plain",
@@ -98,11 +105,11 @@ await check("r2 upload validation", async () => {
   assertStatus(textUpload, 400);
   const largeBytes = new Uint8Array(1024 * 1024 + 1);
   const largeUpload = await putBytes(
-    `${r2Api}/v8/artifacts/${id}-large?teamId=${encodedTeam}`,
+    `${r2Api}${ARTIFACTS_PATH}/${id}-large?teamId=${encodedTeam}`,
     largeBytes,
   );
   assertStatus(largeUpload, 413);
-  const noLength = await fetch(`${r2Api}/v8/artifacts/${id}-stream?teamId=${encodedTeam}`, {
+  const noLength = await fetch(`${r2Api}${ARTIFACTS_PATH}/${id}-stream?teamId=${encodedTeam}`, {
     body: new ReadableStream({
       start(controller) {
         controller.enqueue(new Uint8Array(1024 * 1024 + 1));
@@ -118,7 +125,7 @@ await check("r2 upload validation", async () => {
 
 await check("r2 cache api invalidates on overwrite", async () => {
   const id = `cache-${Date.now()}`;
-  const url = `${r2Api}/v8/artifacts/${id}?teamId=${encodedTeam}`;
+  const url = `${r2Api}${ARTIFACTS_PATH}/${id}?teamId=${encodedTeam}`;
   const encoder = new TextEncoder();
   const oldBytes = encoder.encode("old");
   const oldPut = await putBytes(url, oldBytes);
@@ -138,10 +145,10 @@ await check("r2 branch fallback", async () => {
   const id = `branch-${Date.now()}`;
   const encoder = new TextEncoder();
   const bytes = encoder.encode("main");
-  const put = await putBytes(`${r2Api}/v8/artifacts/${id}?teamId=${encodedTeam}`, bytes);
+  const put = await putBytes(`${r2Api}${ARTIFACTS_PATH}/${id}?teamId=${encodedTeam}`, bytes);
   assertStatus(put, 200);
   const response = await authedFetch(
-    `${r2Api}/v8/artifacts/${id}?teamId=${encodedTeam}&branch=pr-1`,
+    `${r2Api}${ARTIFACTS_PATH}/${id}?teamId=${encodedTeam}&branch=pr-1`,
   );
   assertStatus(response, 200);
   const text = await response.text();
@@ -152,20 +159,20 @@ await check("d1 token admin create duplicate revoke", async () => {
   const id = `tok_${Date.now()}`;
   const rawToken = `raw_${Date.now()}`;
   const body = { id, scopes: ["read", "write"], teams: [team], token: rawToken };
-  const created = await adminFetch(`${r2Api}/internal/tokens`, {
+  const created = await adminFetch(`${r2Api}${RoutePath.InternalTokens}`, {
     body: JSON.stringify(body),
     headers: { "Content-Type": "application/json" },
     method: "POST",
   });
   assertStatus(created, 201);
-  const duplicate = await adminFetch(`${r2Api}/internal/tokens`, {
+  const duplicate = await adminFetch(`${r2Api}${RoutePath.InternalTokens}`, {
     body: JSON.stringify(body),
     headers: { "Content-Type": "application/json" },
     method: "POST",
   });
   assertStatus(duplicate, 409);
   const createdTokenPut = await fetch(
-    `${r2Api}/v8/artifacts/d1-token-${Date.now()}?teamId=${encodedTeam}`,
+    `${r2Api}${ARTIFACTS_PATH}/d1-token-${Date.now()}?teamId=${encodedTeam}`,
     {
       body: new Uint8Array([7]),
       headers: { Authorization: `Bearer ${rawToken}`, "Content-Type": "application/octet-stream" },
@@ -174,24 +181,32 @@ await check("d1 token admin create duplicate revoke", async () => {
   );
   assertStatus(createdTokenPut, 200);
   const encodedId = encodeURIComponent(id);
-  const revoked = await adminFetch(`${r2Api}/internal/tokens/${encodedId}/revoke`, {
-    method: "POST",
-  });
+  const revoked = await adminFetch(
+    `${r2Api}${RoutePath.InternalTokens}/${encodedId}/${RouteAction.Revoke}`,
+    {
+      method: "POST",
+    },
+  );
   assertStatus(revoked, 200);
-  const revokedGet = await fetch(`${r2Api}/v8/artifacts/status`, {
+  const revokedGet = await fetch(`${r2Api}${ARTIFACT_STATUS_PATH}`, {
     headers: { Authorization: `Bearer ${rawToken}` },
   });
   assertStatus(revokedGet, 401);
 });
 
 await check("internal stats and purge", async () => {
-  const stats = await adminFetch(`${r2Api}/internal/teams/${encodedTeam}/stats`);
+  const stats = await adminFetch(
+    `${r2Api}${RoutePath.InternalTeams}/${encodedTeam}/${RouteAction.Stats}`,
+  );
   assertStatus(stats, 200);
   const statsBody = await stats.json();
   assert(statsBody.objects > 0, `expected objects before purge, got ${JSON.stringify(statsBody)}`);
-  const purge = await adminFetch(`${r2Api}/internal/teams/${encodedTeam}/purge-all`, {
-    method: "POST",
-  });
+  const purge = await adminFetch(
+    `${r2Api}${RoutePath.InternalTeams}/${encodedTeam}/${RouteAction.PurgeAll}`,
+    {
+      method: "POST",
+    },
+  );
   assertStatus(purge, 200);
   const purgeBody = await purge.json();
   assert(
@@ -203,7 +218,7 @@ await check("internal stats and purge", async () => {
 
 await check("kv put head get lookup purge", async () => {
   const id = `kv-${Date.now()}`;
-  const url = `${kvApi}/v8/artifacts/${id}?teamId=${encodedTeam}`;
+  const url = `${kvApi}${ARTIFACTS_PATH}/${id}?teamId=${encodedTeam}`;
   const encoder = new TextEncoder();
   const bytes = encoder.encode("hello-kv");
   const put = await putBytes(url, bytes);
@@ -213,7 +228,7 @@ await check("kv put head get lookup purge", async () => {
   const get = await authedFetch(url);
   const text = await get.text();
   assertText(text, "hello-kv");
-  const lookup = await authedFetch(`${kvApi}/v8/artifacts?teamId=${encodedTeam}`, {
+  const lookup = await authedFetch(`${kvApi}${ARTIFACTS_PATH}?teamId=${encodedTeam}`, {
     body: JSON.stringify({ hashes: [id] }),
     headers: { "Content-Type": "application/json" },
     method: "POST",
@@ -221,9 +236,12 @@ await check("kv put head get lookup purge", async () => {
   assertStatus(lookup, 200);
   const body = await lookup.json();
   assert(body[id]?.size === 8, `bad kv lookup ${JSON.stringify(body)}`);
-  const purge = await adminFetch(`${kvApi}/internal/teams/${encodedTeam}/purge-all`, {
-    method: "POST",
-  });
+  const purge = await adminFetch(
+    `${kvApi}${RoutePath.InternalTeams}/${encodedTeam}/${RouteAction.PurgeAll}`,
+    {
+      method: "POST",
+    },
+  );
   assertStatus(purge, 200);
 });
 

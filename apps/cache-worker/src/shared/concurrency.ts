@@ -4,22 +4,15 @@ export async function mapWithConcurrency<T, U>(
   mapper: (item: T) => Promise<U>,
 ): Promise<U[]> {
   const results = Array.from<U>({ length: items.length });
-  let nextIndex = 0;
+  const batchSize = Math.max(1, concurrency);
 
-  async function worker(): Promise<void> {
-    while (nextIndex < items.length) {
-      const index = nextIndex;
-      nextIndex += 1;
-      results[index] = await mapper(items[index]);
+  for (let batchStart = 0; batchStart < items.length; batchStart += batchSize) {
+    const batch = items.slice(batchStart, batchStart + batchSize);
+    const batchResults = await Promise.all(batch.map((item) => mapper(item)));
+    for (const [batchIndex, result] of batchResults.entries()) {
+      results[batchStart + batchIndex] = result;
     }
   }
 
-  const workerCount = Math.min(concurrency, items.length);
-  const workers: Promise<void>[] = [];
-  for (let index = 0; index < workerCount; index += 1) {
-    const workerPromise = worker();
-    workers.push(workerPromise);
-  }
-  await Promise.all(workers);
   return results;
 }
