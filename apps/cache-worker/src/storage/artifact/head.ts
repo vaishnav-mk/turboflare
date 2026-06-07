@@ -1,6 +1,6 @@
-import { appConfig, ArtifactStore, type Env } from "../app/env";
-import { headKvArtifact } from "./kv";
-import type { ArtifactMetadataObject } from "./metadata";
+import { appConfig, ArtifactStore, type Env } from "../../app/env";
+import { headKvArtifact } from "../kv";
+import type { ArtifactMetadataObject } from "../metadata";
 
 export function headArtifactObject(
   env: Env,

@@ -1,6 +1,6 @@
-import { appConfig, ArtifactStore, type Env } from "../app/env";
-import { deleteCachedArtifacts } from "./cache-api";
-import { deleteKvArtifacts } from "./kv";
+import { appConfig, ArtifactStore, type Env } from "../../app/env";
+import { deleteCachedArtifacts } from "../cache-api";
+import { deleteKvArtifacts } from "../kv";
 
 export async function deleteStoredArtifacts(
   env: Env,

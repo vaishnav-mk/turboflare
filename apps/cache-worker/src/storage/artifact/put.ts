@@ -1,7 +1,7 @@
-import { appConfig, ArtifactStore, type Env } from "../app/env";
-import { OCTET_STREAM } from "./constants";
-import { putKvArtifact } from "./kv";
-import type { ArtifactMetadataObject } from "./metadata";
+import { appConfig, ArtifactStore, type Env } from "../../app/env";
+import { OCTET_STREAM } from "../constants";
+import { putKvArtifact } from "../kv";
+import type { ArtifactMetadataObject } from "../metadata";
 
 export function putArtifactObject(
   env: Env,

@@ -1,5 +1,5 @@
-import { appConfig, ArtifactStore, type Env } from "../app/env";
-import { MAX_KV_VALUE_BYTES } from "./constants";
+import { appConfig, ArtifactStore, type Env } from "../../app/env";
+import { MAX_KV_VALUE_BYTES } from "../constants";
 
 export function artifactUploadLimit(env: Env): number {
   const config = appConfig(env);

@@ -1,8 +1,8 @@
-import type { Env } from "../app/env";
-import type { AuthContext } from "../auth/types";
-import { parseDurationMs } from "../shared/duration";
-import type { TenantContext } from "../tenancy/types";
-import type { ArtifactMetadataObject } from "./metadata";
+import type { Env } from "../../app/env";
+import type { AuthContext } from "../../auth/types";
+import { parseDurationMs } from "../../shared/duration";
+import type { TenantContext } from "../../tenancy/types";
+import type { ArtifactMetadataObject } from "../metadata";
 
 interface ArtifactIndexInput {
   artifactId: string;

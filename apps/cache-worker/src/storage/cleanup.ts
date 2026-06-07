@@ -1,7 +1,7 @@
 import { appConfig, type Env } from "../app/env";
-import { deleteStoredArtifacts } from "./artifact-delete";
+import { deleteStoredArtifacts } from "./artifact/delete";
 import { ARTIFACT_NAMESPACE_VERSION } from "./constants";
-import { deleteIndexedArtifacts } from "./artifact-index";
+import { deleteIndexedArtifacts } from "./artifact/index";
 import { listStoredArtifacts } from "./list";
 
 interface CleanupResult {

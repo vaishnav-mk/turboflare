@@ -1,6 +1,6 @@
-import { appConfig, ArtifactStore, type Env } from "../app/env";
-import { getKvArtifact } from "./kv";
-import type { ArtifactBodyObject } from "./metadata";
+import { appConfig, ArtifactStore, type Env } from "../../app/env";
+import { getKvArtifact } from "../kv";
+import type { ArtifactBodyObject } from "../metadata";
 
 export function getArtifactObject(
   env: Env,

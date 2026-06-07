@@ -4,7 +4,7 @@ import type { Env } from "../app/env";
 import { ErrorCode, errorResponse, jsonResponse } from "../http/response";
 import { mapWithConcurrency } from "../shared/concurrency";
 import type { TenantContext } from "../tenancy/types";
-import { headArtifactObject } from "./artifact-head";
+import { headArtifactObject } from "./artifact/head";
 import { BATCH_HEAD_CONCURRENCY, MAX_BATCH_HASHES } from "./constants";
 import { artifactKey, fallbackArtifactKey } from "./keys";
 import { lookupHit } from "./metadata";

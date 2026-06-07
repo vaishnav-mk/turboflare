@@ -3,7 +3,7 @@ import { type ArtifactLookupRequest, HttpMethod } from "@turboflare/protocol";
 import type { Env } from "../../app/env";
 import { ErrorCode, errorResponse, methodNotAllowed } from "../../http/response";
 import { readBoundedJson } from "../../shared/json";
-import { artifactStoreUnavailable } from "../../storage/artifact-availability";
+import { artifactStoreUnavailable } from "../../storage/artifact/availability";
 import { MAX_TURBO_JSON_BODY_BYTES } from "../../storage/constants";
 import { lookupArtifacts } from "../../storage/lookup";
 import type { TenantContext } from "../../tenancy/types";
