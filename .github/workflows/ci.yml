@@ -6,10 +6,35 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  verify:
-    name: verify
+  internal:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: oxfmt
+            command: pnpm format:check
+          - name: oxlint
+            command: pnpm lint
+          - name: typecheck
+            command: pnpm typecheck
+          - name: tests
+            command: pnpm test
+          - name: integration
+            command: pnpm test:integration
+          - name: build
+            command: pnpm build
+          - name: r2 lifecycle dry-run
+            command: pnpm r2:lifecycle:dry-run
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -20,7 +45,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm check
+      - run: ${{ matrix.command }}
 
   without-remote:
     name: without turborepo
