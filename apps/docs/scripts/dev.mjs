@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { createReadStream, existsSync } from "node:fs";
-import { extname, join } from "node:path";
+import { extname, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 
 const root = new URL("..", import.meta.url).pathname;
@@ -21,14 +21,21 @@ createServer((request, response) => {
 
 function routePath(pathname) {
 	const decoded = decodeURIComponent(pathname);
+	let target;
 	if (decoded === "/") {
-		return join(dist, "index.html");
+		target = join(dist, "index.html");
+	} else if (decoded.endsWith("/")) {
+		target = join(dist, decoded, "index.html");
+	} else {
+		const direct = join(dist, decoded);
+		target = extname(decoded) === "" ? join(direct, "index.html") : direct;
 	}
-	if (decoded.endsWith("/")) {
-		return join(dist, decoded, "index.html");
+
+	const resolved = resolve(target);
+	if (!resolved.startsWith(resolve(dist))) {
+		return join(dist, "404.html");
 	}
-	const direct = join(dist, decoded);
-	return extname(decoded) === "" ? join(direct, "index.html") : direct;
+	return resolved;
 }
 
 function contentType(file) {
