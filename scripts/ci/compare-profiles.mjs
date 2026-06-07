@@ -4,11 +4,12 @@ const outputDir = "ci-results";
 await mkdir(outputDir, { recursive: true });
 
 const noCache = JSON.parse(await readFile("ci-results/no-cache/profile.json", "utf8"));
-const remote = JSON.parse(await readFile("ci-results/remote/profile.json", "utf8"));
+const seed = JSON.parse(await readFile("ci-results/seed/profile.json", "utf8"));
+const rebuild = JSON.parse(await readFile("ci-results/rebuild/profile.json", "utf8"));
 
 const coldMs = noCache.buildMs;
-const warmMs = remote.buildMs;
-const seedMs = remote.seedMs;
+const seedMs = seed.buildMs;
+const warmMs = rebuild.buildMs;
 const savedMs = coldMs - warmMs;
 const speedup = coldMs > 0 ? ((savedMs / coldMs) * 100) : 0;
 
@@ -16,24 +17,31 @@ const verdict = speedup > 10 ? "faster" : speedup > 0 ? "marginal" : "no improve
 
 const md = `# CI Cache Comparison
 
+## Results
+
+| Step | Time | Cache hits | Cache misses |
+| --- | ---: | ---: | ---: |
+| Cold build (no cache) | ${fmt(coldMs)} | ${noCache.cacheHits} | ${noCache.cacheBypasses ?? noCache.cacheMisses} bypasses |
+| Seed remote cache | ${fmt(seedMs)} | ${seed.cacheHits} | ${seed.cacheMisses} misses |
+| **Rebuild from remote** | **${fmt(warmMs)}** | **${rebuild.cacheHits}** | **${rebuild.cacheMisses}** |
+
+## Summary
+
 | Metric | Value |
 | --- | ---: |
-| Cold build (no cache) | ${fmt(coldMs)} |
-| Seed remote cache | ${fmt(seedMs)} |
-| Warm rebuild (remote hits) | ${fmt(warmMs)} |
 | **Time saved** | **${fmt(savedMs)}** |
 | **Speedup** | **${speedup.toFixed(1)}%** |
-| Cache hits on rebuild | ${remote.cacheHits} / ${remote.tasks} tasks |
-| Cache misses on rebuild | ${remote.cacheMisses} |
+| Tasks cached on rebuild | ${rebuild.cached} / ${rebuild.tasks} |
 | Verdict | **${verdict}** |
 
 ## How this works
 
-1. **"without turborepo"** runs all CI tasks (\`typecheck\`, \`test\`, \`test:integration\`, \`build\`) with \`--cache=local:\` — zero caching, full cold build.
-2. **"with turborepo"** first seeds the Turboflare remote cache (\`remote:w\`), then rebuilds from it (\`remote:r\` only, no local cache). The rebuild time is the "warm" number.
-3. The speedup = \`(cold - warm) / cold * 100\`.
+1. **without turborepo** — runs all CI tasks (\`typecheck\`, \`test\`, \`test:integration\`, \`build\`) with \`--cache=local:\`. Zero caching. Full cold build every time.
+2. **with turborepo (seed)** — same tasks, but writes artifacts to Turboflare remote cache (\`remote:w\`). This is the first-run cost.
+3. **with turborepo (rebuild)** — runs on a separate runner with empty local cache, reads only from remote (\`remote:r\`). This simulates a subsequent CI run after the cache is warm.
+4. **Speedup** = \`(cold - rebuild) / cold × 100\`
 
-A real-world CI would keep the remote cache warm across runs, so subsequent PRs/merges hit the warm path automatically.
+In real-world usage, step 2 happens once (or when code changes), and every subsequent CI run gets step 3 speeds.
 `;
 
 await writeFile(`${outputDir}/comparison.md`, md);
@@ -42,7 +50,7 @@ if (process.env.GITHUB_STEP_SUMMARY) {
 	await writeFile(process.env.GITHUB_STEP_SUMMARY, md, { flag: "a" });
 }
 
-console.log(`cold: ${fmt(coldMs)}  warm: ${fmt(warmMs)}  saved: ${fmt(savedMs)}  speedup: ${speedup.toFixed(1)}%  verdict: ${verdict}`);
+console.log(`cold: ${fmt(coldMs)}  seed: ${fmt(seedMs)}  warm: ${fmt(warmMs)}  saved: ${fmt(savedMs)}  speedup: ${speedup.toFixed(1)}%  verdict: ${verdict}`);
 
 function fmt(ms) {
 	if (ms < 0) return `-${fmt(-ms)}`;

@@ -44,8 +44,8 @@ jobs:
           name: profile-no-cache
           path: ci-results/profile.json
 
-  with-remote:
-    name: with turborepo
+  seed-remote:
+    name: with turborepo (seed)
     runs-on: ubuntu-latest
     if: github.repository == 'vaishnav-mk/turboflare' && github.event_name != 'pull_request'
     steps:
@@ -58,24 +58,22 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: build (seed + rebuild from remote)
-        run: node scripts/ci/profile-build.mjs --mode remote
+      - name: cold build + upload
+        run: node scripts/ci/profile-build.mjs --mode seed
         env:
           TURBO_API: https://turboflare-cache-worker.wishee.workers.dev
           TURBO_TEAM: bench-${{ github.run_id }}
           TURBO_TOKEN: ${{ secrets.TURBOFLARE_REMOTE_TOKEN }}
-          INTERNAL_ADMIN_TOKEN: ${{ secrets.TURBOFLARE_INTERNAL_ADMIN_TOKEN }}
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: profile-remote
+          name: profile-seed
           path: ci-results/profile.json
 
-  compare:
-    name: compare ci profiles
+  rebuild-remote:
+    name: with turborepo (rebuild)
     runs-on: ubuntu-latest
-    if: github.repository == 'vaishnav-mk/turboflare' && github.event_name != 'pull_request'
-    needs: [without-remote, with-remote]
+    needs: [seed-remote]
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -84,14 +82,40 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: rebuild from remote cache
+        run: node scripts/ci/profile-build.mjs --mode rebuild
+        env:
+          TURBO_API: https://turboflare-cache-worker.wishee.workers.dev
+          TURBO_TEAM: bench-${{ github.run_id }}
+          TURBO_TOKEN: ${{ secrets.TURBOFLARE_REMOTE_TOKEN }}
+          INTERNAL_ADMIN_TOKEN: ${{ secrets.TURBOFLARE_INTERNAL_ADMIN_TOKEN }}
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: profile-rebuild
+          path: ci-results/profile.json
+
+  compare:
+    name: compare ci profiles
+    runs-on: ubuntu-latest
+    if: github.repository == 'vaishnav-mk/turboflare' && github.event_name != 'pull_request'
+    needs: [without-remote, seed-remote, rebuild-remote]
+    steps:
+      - uses: actions/checkout@v6
       - uses: actions/download-artifact@v7
         with:
           name: profile-no-cache
           path: ci-results/no-cache
       - uses: actions/download-artifact@v7
         with:
-          name: profile-remote
-          path: ci-results/remote
+          name: profile-seed
+          path: ci-results/seed
+      - uses: actions/download-artifact@v7
+        with:
+          name: profile-rebuild
+          path: ci-results/rebuild
       - name: compare
         run: node scripts/ci/compare-profiles.mjs
       - uses: actions/upload-artifact@v7
@@ -99,3 +123,29 @@ jobs:
         with:
           name: ci-comparison
           path: ci-results/comparison.md
+
+  dogfood:
+    name: dogfood remote cache
+    runs-on: ubuntu-latest
+    if: github.repository == 'vaishnav-mk/turboflare' && github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.5.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/ci/dogfood-remote-cache.mjs
+        env:
+          INTERNAL_ADMIN_TOKEN: ${{ secrets.TURBOFLARE_INTERNAL_ADMIN_TOKEN }}
+          TURBO_API: https://turboflare-cache-worker.wishee.workers.dev
+          TURBO_TEAM: dogfood-${{ github.run_id }}
+          TURBO_TOKEN: ${{ secrets.TURBOFLARE_REMOTE_TOKEN }}
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ci-dogfood-remote-cache
+          path: ci-results/dogfood-remote-cache
