@@ -11,41 +11,64 @@ let cachedRawScopedTokens: string | undefined;
 let cachedTokenRules: readonly StaticTokenRule[] = [];
 
 export async function authenticateBearer(request: Request, env: Env): Promise<AuthContext | null> {
-	const token = readBearerToken(request);
-	if (token === null) {
-		return null;
-	}
-	if (token.length > MAX_BEARER_TOKEN_LENGTH) {
-		return null;
-	}
+  const token = readBearerToken(request);
+  if (token === null) {
+    return null;
+  }
+  if (token.length > MAX_BEARER_TOKEN_LENGTH) {
+    return null;
+  }
 
-	const rule = tokenRules(env).find((tokenRule) => timingSafeEqual(token, tokenRule.token));
-	if (rule !== undefined) {
-		return {
-			allowedTeams: rule.teams,
-			scopes: rule.scopes,
-			tokenId: rule.id ?? "static",
-		};
-	}
+  const rules = tokenRules(env);
+  const rule = matchingTokenRule(token, rules);
+  if (rule !== undefined) {
+    return {
+      allowedTeams: rule.teams,
+      scopes: rule.scopes,
+      tokenId: rule.id ?? "static",
+    };
+  }
 
-	return authenticateD1Token(env, token);
+  return authenticateD1Token(env, token);
 }
 
 export function hasScope(authContext: AuthContext, scope: AuthScope): boolean {
-	return authContext.scopes.includes(scope);
+  return authContext.scopes.includes(scope);
 }
 
 export function canAccessTenant(authContext: AuthContext, tenant: TenantContext): boolean {
-	return authContext.allowedTeams.includes(ALL_TEAMS) || authContext.allowedTeams.includes(tenant.key);
+  return canAccessTeam(authContext, tenant.key);
+}
+
+export function canAccessTeam(authContext: AuthContext, teamKey: string): boolean {
+  const hasAllTeams = authContext.allowedTeams.includes(ALL_TEAMS);
+  const hasTeam = authContext.allowedTeams.includes(teamKey);
+  return hasAllTeams || hasTeam;
 }
 
 function tokenRules(env: Env): readonly StaticTokenRule[] {
-	if (env.TURBO_TOKEN === cachedRawTokens && env.TURBO_TOKEN_SCOPES === cachedRawScopedTokens) {
-		return cachedTokenRules;
-	}
+  if (env.TURBO_TOKEN === cachedRawTokens && env.TURBO_TOKEN_SCOPES === cachedRawScopedTokens) {
+    return cachedTokenRules;
+  }
 
-	cachedRawTokens = env.TURBO_TOKEN;
-	cachedRawScopedTokens = env.TURBO_TOKEN_SCOPES;
-	cachedTokenRules = [...parseAllowedTokens(env.TURBO_TOKEN), ...parseScopedTokens(env.TURBO_TOKEN_SCOPES)];
-	return cachedTokenRules;
+  cachedRawTokens = env.TURBO_TOKEN;
+  cachedRawScopedTokens = env.TURBO_TOKEN_SCOPES;
+  cachedTokenRules = [
+    ...parseAllowedTokens(env.TURBO_TOKEN),
+    ...parseScopedTokens(env.TURBO_TOKEN_SCOPES),
+  ];
+  return cachedTokenRules;
+}
+
+function matchingTokenRule(
+  token: string,
+  rules: readonly StaticTokenRule[],
+): StaticTokenRule | undefined {
+  for (const rule of rules) {
+    if (timingSafeEqual(token, rule.token)) {
+      return rule;
+    }
+  }
+
+  return undefined;
 }
