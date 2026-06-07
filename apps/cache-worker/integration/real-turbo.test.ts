@@ -40,6 +40,7 @@ const TURBO_BIN = join(REPO_ROOT, "node_modules", ".bin", "turbo");
 const TURBO_TOKEN = "fixture-token";
 const TURBO_TEAM = "team_fixture";
 const GENERATED_DIRECTORIES = new Set([".next", ".turbo", "dist", "node_modules"]);
+const TURBO_ENV_KEYS = ["TURBO_API", "TURBO_CACHE", "TURBO_PREFLIGHT", "TURBO_REMOTE_CACHE_SIGNATURE_KEY", "TURBO_TEAM", "TURBO_TEAMID", "TURBO_TOKEN"];
 
 const cleanupTasks: Array<() => Promise<void>> = [];
 
@@ -187,7 +188,7 @@ async function expectNonEmptyDirectory(path: string): Promise<void> {
 
 function runProcess(command: string, args: readonly string[], cwd: string, env: NodeJS.ProcessEnv = {}): Promise<{ stderr: string; stdout: string }> {
 	return new Promise((resolve, reject) => {
-		execFile(command, [...args], { cwd, env: { ...process.env, ...env } }, (error, stdout, stderr) => {
+		execFile(command, [...args], { cwd, env: { ...scrubTurboEnv(process.env), ...env } }, (error, stdout, stderr) => {
 			if (error !== null) {
 				reject(new Error(`${error.message}\n${stdout}\n${stderr}`));
 				return;
@@ -196,6 +197,15 @@ function runProcess(command: string, args: readonly string[], cwd: string, env: 
 			resolve({ stderr, stdout });
 		});
 	});
+}
+
+function scrubTurboEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+	const clean = { ...env };
+	for (const key of TURBO_ENV_KEYS) {
+		delete clean[key];
+	}
+
+	return clean;
 }
 
 function startWorkerServer(env: Env): Promise<TestServer> {

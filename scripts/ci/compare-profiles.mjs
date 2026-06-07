@@ -39,19 +39,40 @@ function comparisonMarkdown(withProfile, withoutProfile) {
 	const withoutSteps = byId(withoutProfile.steps);
 	const ids = [...new Set([...Object.keys(withSteps), ...Object.keys(withoutSteps)])];
 	const totals = {
+		withWarmup: totalDuration(withProfile.warmupSteps),
 		withIncludingWarmup: totalDuration([...withProfile.warmupSteps, ...withProfile.steps]),
 		with: totalDuration(withProfile.steps),
+		withProfilerWall: profileWallDuration(withProfile),
 		without: totalDuration(withoutProfile.steps),
+		withoutProfilerWall: profileWallDuration(withoutProfile),
+	};
+	const profilerOverhead = {
+		with: totals.withProfilerWall === undefined ? undefined : totals.withProfilerWall - totals.withIncludingWarmup,
+		without: totals.withoutProfilerWall === undefined ? undefined : totals.withoutProfilerWall - totals.without,
 	};
 	const lines = [
 		"# ci comparison",
 		"",
-		"This compares the measured warm Turborepo profile against equivalent direct commands. The GitHub job duration also includes checkout, install, and the explicit Turborepo warmup step.",
+		"This compares the measured warm Turborepo profile against equivalent direct commands. The GitHub job duration also includes checkout, setup-node, pnpm install, artifact upload/download, and the explicit Turborepo warmup step.",
 		"",
 		`with turborepo: ${withProfile.success ? "pass" : "fail"}`,
 		`without turborepo: ${withoutProfile.success ? "pass" : "fail"}`,
 		`fastest profile: ${totals.with < totals.without ? "with turborepo" : "without turborepo"}`,
 		`with turborepo including warmup: ${formatDuration(totals.withIncludingWarmup)}`,
+		"",
+		"## measured job-step breakdown",
+		"",
+		"This table explains why the GitHub job boxes are both around two minutes while the warm Turborepo profile is much faster.",
+		"",
+		"| bucket | with turborepo | without turborepo | notes |",
+		"| --- | ---: | ---: | --- |",
+		`| explicit cache warmup inside profiler | ${formatDuration(totals.withWarmup)} | ${formatDuration(0)} | one-time cost to populate local Turborepo cache before measuring warm hits |`,
+		`| measured verification profile | ${formatDuration(totals.with)} | ${formatDuration(totals.without)} | the apples-to-apples table below |`,
+		`| profiler script overhead | ${durationOrMissing(profilerOverhead.with)} | ${durationOrMissing(profilerOverhead.without)} | process orchestration overhead inside \`profile.mjs\` |`,
+		`| measured total inside profiler | ${durationOrMissing(totals.withProfilerWall)} | ${durationOrMissing(totals.withoutProfilerWall)} | excludes checkout, setup-node, pnpm install, and artifact upload/download |`,
+		"| GitHub setup/install/artifact overhead | not measured here | not measured here | visible in the workflow step timings above the summary |",
+		"",
+		"## warm profile comparison",
 		"",
 		"| step | with turborepo | without turborepo | delta | % diff | faster |",
 		"| --- | ---: | ---: | ---: | ---: | --- |",
@@ -136,6 +157,10 @@ function formatDuration(durationMs) {
 	return `${(durationMs / 1000).toFixed(2)}s`;
 }
 
+function durationOrMissing(durationMs) {
+	return durationMs === undefined ? "missing" : formatDuration(durationMs);
+}
+
 function formatSignedDuration(durationMs) {
 	const sign = durationMs > 0 ? "+" : "";
 	return `${sign}${formatDuration(durationMs)}`;
@@ -143,4 +168,10 @@ function formatSignedDuration(durationMs) {
 
 function totalDuration(steps) {
 	return steps.reduce((total, step) => total + step.durationMs, 0);
+}
+
+function profileWallDuration(profile) {
+	const started = Date.parse(profile.startedAt);
+	const ended = Date.parse(profile.endedAt);
+	return Number.isFinite(started) && Number.isFinite(ended) ? ended - started : undefined;
 }
