@@ -168,5 +168,5 @@ function recordSignatureMetric(request: Request, env: Env, ctx: ExecutionContext
 }
 
 function hasSignature(request: Request): boolean {
-	return (request.headers.get(ArtifactHeader.Sha)?.trim().length ?? 0) > 0;
+	return (request.headers.get(ArtifactHeader.Tag)?.trim().length ?? 0) > 0;
 }

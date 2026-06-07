@@ -91,7 +91,7 @@ Use `TURBO_TOKEN` for simple single-tenant deployments. Use `TURBO_TOKEN_SCOPES`
 
 ## Signatures and Branch Policies
 
-Turbo can sign remote cache artifacts with `TURBO_REMOTE_CACHE_SIGNATURE_KEY`. Turboflare preserves `x-artifact-sha` metadata and can require it on uploads:
+Turbo can sign remote cache artifacts with `TURBO_REMOTE_CACHE_SIGNATURE_KEY` and `remoteCache.signature=true` in `turbo.json`. Turboflare preserves `x-artifact-tag` and can require it on uploads:
 
 ```txt
 SIGNATURE_POLICY=off|accept|monitor|require

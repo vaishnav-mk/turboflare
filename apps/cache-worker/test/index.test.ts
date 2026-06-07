@@ -406,7 +406,7 @@ describe("cache worker", () => {
 		const signed = await handleRequest(
 			new Request(`${BASE_URL}${ARTIFACTS_PATH}/${randomArtifactId()}?teamId=${TEAM_ID}`, {
 				body: new Uint8Array([1]),
-				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/octet-stream", "x-artifact-sha": "sha-value" },
+				headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/octet-stream", "x-artifact-tag": "signature-tag" },
 				method: "PUT",
 			}),
 			{ ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS, SIGNATURE_POLICY: "require", TURBO_TOKEN: TOKEN },
