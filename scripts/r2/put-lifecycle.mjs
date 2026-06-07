@@ -71,8 +71,8 @@ if (!response.ok || result.success === false) {
 console.log(JSON.stringify({ bucketName, rules: body.rules.length, success: true }, null, 2));
 
 function positiveInteger(value, name) {
-  const parsed = Number.parseInt(String(value), 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
     throw new Error(`${name} must be a positive integer`);
   }
 

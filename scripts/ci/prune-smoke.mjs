@@ -3,6 +3,7 @@ import { copyFile, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
+import { requiredEnv } from "../shared/env.mjs";
 import { redactTokens } from "../shared/redact.mjs";
 import { removeGeneratedDirectories } from "../shared/turbo-fixture.mjs";
 
@@ -12,13 +13,10 @@ if (target === undefined) {
   throw new Error("usage: node scripts/ci/prune-smoke.mjs <target-package> [task]");
 }
 
-if (
-  process.env.TURBO_API === undefined ||
-  process.env.TURBO_TOKEN === undefined ||
-  process.env.TURBO_TEAM === undefined
-) {
-  throw new Error("TURBO_API, TURBO_TOKEN, and TURBO_TEAM are required");
-}
+const turboApi = requiredEnv("TURBO_API");
+const turboToken = requiredEnv("TURBO_TOKEN");
+const turboTeam = requiredEnv("TURBO_TEAM");
+const secretTokens = [turboToken];
 
 const cwd = resolve(process.env.PRUNE_CWD ?? process.cwd());
 const turboBin = resolve(
@@ -102,7 +100,15 @@ function run(command, args, cwd) {
       args,
       {
         cwd,
-        env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1", TURBO_TELEMETRY_DISABLED: "1" },
+        env: {
+          ...process.env,
+          FORCE_COLOR: "0",
+          NO_COLOR: "1",
+          TURBO_API: turboApi,
+          TURBO_TEAM: turboTeam,
+          TURBO_TELEMETRY_DISABLED: "1",
+          TURBO_TOKEN: turboToken,
+        },
       },
       (error, stdout, stderr) => {
         const durationMs = Date.now() - started;
@@ -116,7 +122,7 @@ function run(command, args, cwd) {
         if (error !== null) {
           reject(
             new Error(
-              `${error.message}\n${redactTokens(stdout, [process.env.TURBO_TOKEN])}\n${redactTokens(stderr, [process.env.TURBO_TOKEN])}`,
+              `${error.message}\n${redactTokens(stdout, secretTokens)}\n${redactTokens(stderr, secretTokens)}`,
             ),
           );
           return;
@@ -136,6 +142,6 @@ function summary(value) {
         /Remote caching|cache miss|cache hit|Tasks:|Cached:|Time:|warning|error/i.test(line),
       )
       .join("\n"),
-    [process.env.TURBO_TOKEN],
+    secretTokens,
   );
 }

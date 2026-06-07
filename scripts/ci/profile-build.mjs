@@ -6,9 +6,7 @@ import { performance } from "node:perf_hooks";
 import { requiredEnv } from "../shared/env.mjs";
 import { redactTokens } from "../shared/redact.mjs";
 
-const mode = process.argv.includes("--mode")
-  ? process.argv[process.argv.indexOf("--mode") + 1]
-  : "no-cache";
+const mode = readArg("--mode") ?? "no-cache";
 const outputDir = "ci-results";
 const tasks = ["typecheck", "test", "test:integration", "build"];
 const timeout = process.env.TURBO_REMOTE_CACHE_TIMEOUT ?? "20";
@@ -54,6 +52,18 @@ function remoteEnv() {
     TURBO_TEAM: requiredEnv("TURBO_TEAM"),
     TURBO_TELEMETRY_DISABLED: "1",
   };
+}
+
+function readArg(name) {
+  const index = process.argv.indexOf(name);
+  if (index === -1) {
+    return undefined;
+  }
+  const value = process.argv[index + 1];
+  if (value === undefined || value.startsWith("--")) {
+    throw new Error(`${name} requires a value`);
+  }
+  return value;
 }
 
 function runTurbo(id, cacheMode, extraEnv = {}) {

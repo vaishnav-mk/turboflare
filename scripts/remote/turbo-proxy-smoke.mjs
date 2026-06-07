@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { requiredEnv } from "../shared/env.mjs";
+import { redactTokens } from "../shared/redact.mjs";
 import { removeGeneratedDirectories } from "../shared/turbo-fixture.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -14,6 +15,7 @@ const FIXTURE_ROOT = join(REPO_ROOT, "fixtures", "complex-turbo-monorepo");
 const TURBO_BIN = join(REPO_ROOT, "node_modules", ".bin", "turbo");
 const target = requiredEnv("TURBOFLARE_R2_API");
 const token = requiredEnv("TURBOFLARE_TOKEN");
+const secretTokens = [token];
 const team = `proxy-smoke-${Date.now()}`;
 
 const requests = [];
@@ -26,6 +28,8 @@ try {
   const first = await runTurbo(fixture, proxy.url, token, team, "remote:rw");
   await removeGeneratedDirectories(fixture);
   const second = await runTurbo(fixture, proxy.url, token, team, "remote:r");
+  assert(/cache miss/i.test(first.stdout), "expected first run to miss remote cache");
+  assert(/cache hit/i.test(second.stdout), "expected second run to hit remote cache");
   console.log(
     JSON.stringify({ first: summarize(first), requests, second: summarize(second), team }, null, 2),
   );
@@ -127,7 +131,8 @@ function run(command, args, cwd, env = {}) {
     execFile(command, args, { cwd, env: { ...process.env, ...env } }, (error, stdout, stderr) => {
       const result = { stderr, stdout };
       if (error !== null) {
-        reject(new Error(`${error.message}\n${stdout}\n${stderr}`));
+        const output = redactTokens(`${stdout}\n${stderr}`, secretTokens);
+        reject(new Error(`${error.message}\n${output}`));
         return;
       }
       resolve(result);
@@ -137,10 +142,19 @@ function run(command, args, cwd, env = {}) {
 
 function summarize(result) {
   return {
-    stderr: result.stderr,
-    stdout: result.stdout
-      .split(/\r?\n/)
-      .filter((line) => /cache|Cached|Remote|Tasks|Time/i.test(line))
-      .join("\n"),
+    stderr: redactTokens(result.stderr, secretTokens),
+    stdout: redactTokens(
+      result.stdout
+        .split(/\r?\n/)
+        .filter((line) => /cache|Cached|Remote|Tasks|Time/i.test(line))
+        .join("\n"),
+      secretTokens,
+    ),
   };
+}
+
+function assert(value, message) {
+  if (!value) {
+    throw new Error(message);
+  }
 }

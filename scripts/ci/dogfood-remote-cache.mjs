@@ -27,10 +27,10 @@ try {
   const write = phases[0];
   const read = phases[1];
   if (!/cache (?:miss|bypass)/i.test(write.stdout)) {
-    throw new Error(`expected write phase to execute tasks\n${write.stdout}`);
+    throw new Error(`expected write phase to execute tasks\n${write.stdoutTail}`);
   }
   if (!/cache hit/i.test(read.stdout) || /cache (?:miss|bypass)/i.test(read.stdout)) {
-    throw new Error(`expected read phase to restore only remote cache hits\n${read.stdout}`);
+    throw new Error(`expected read phase to restore only remote cache hits\n${read.stdoutTail}`);
   }
 } finally {
   if (internalAdminToken !== undefined) {

@@ -5,6 +5,7 @@ const kvApi = requiredEnv("TURBOFLARE_KV_API");
 const token = requiredEnv("TURBOFLARE_TOKEN");
 const adminToken = requiredEnv("TURBOFLARE_ADMIN_TOKEN");
 const team = process.env.TURBOFLARE_TEAM ?? `remote-smoke-${Date.now()}`;
+const encodedTeam = encodeURIComponent(team);
 
 const results = [];
 
@@ -28,14 +29,17 @@ await check("r2 authenticated status", async () => {
 await check("r2 v2 compatibility", async () => {
   const user = await authedFetch(`${r2Api}/v2/user`);
   assertStatus(user, 200);
-  const teamResponse = await authedFetch(`${r2Api}/v2/teams/${team}`);
+  const teamResponse = await authedFetch(`${r2Api}/v2/teams/${encodedTeam}`);
   assertStatus(teamResponse, 200);
 });
 
 await check("r2 preflight", async () => {
-  const response = await fetch(`${r2Api}/v8/artifacts/preflight-${Date.now()}?teamId=${team}`, {
-    method: "OPTIONS",
-  });
+  const response = await fetch(
+    `${r2Api}/v8/artifacts/preflight-${Date.now()}?teamId=${encodedTeam}`,
+    {
+      method: "OPTIONS",
+    },
+  );
   assertStatus(response, 204);
   assert(
     response.headers.get("access-control-allow-methods")?.includes("PUT"),
@@ -45,7 +49,7 @@ await check("r2 preflight", async () => {
 
 await check("r2 put head get lookup events", async () => {
   const id = `artifact-${Date.now()}`;
-  const path = `/v8/artifacts/${id}?teamId=${team}`;
+  const path = `/v8/artifacts/${id}?teamId=${encodedTeam}`;
   const bytes = new TextEncoder().encode("hello-r2");
   const put = await putBytes(`${r2Api}${path}`, bytes, {
     "x-artifact-duration": "12",
@@ -62,7 +66,7 @@ await check("r2 put head get lookup events", async () => {
   const getText = await get.text();
   assertText(getText, "hello-r2");
 
-  const lookup = await authedFetch(`${r2Api}/v8/artifacts?teamId=${team}`, {
+  const lookup = await authedFetch(`${r2Api}/v8/artifacts?teamId=${encodedTeam}`, {
     body: JSON.stringify({ hashes: [id, `missing-${id}`] }),
     headers: { "Content-Type": "application/json" },
     method: "POST",
@@ -85,7 +89,7 @@ await check("r2 put head get lookup events", async () => {
 await check("r2 upload validation", async () => {
   const id = `validation-${Date.now()}`;
   const textUpload = await putBytes(
-    `${r2Api}/v8/artifacts/${id}?teamId=${team}`,
+    `${r2Api}/v8/artifacts/${id}?teamId=${encodedTeam}`,
     new Uint8Array([1]),
     {
       "Content-Type": "text/plain",
@@ -94,11 +98,11 @@ await check("r2 upload validation", async () => {
   assertStatus(textUpload, 400);
   const largeBytes = new Uint8Array(1024 * 1024 + 1);
   const largeUpload = await putBytes(
-    `${r2Api}/v8/artifacts/${id}-large?teamId=${team}`,
+    `${r2Api}/v8/artifacts/${id}-large?teamId=${encodedTeam}`,
     largeBytes,
   );
   assertStatus(largeUpload, 413);
-  const noLength = await fetch(`${r2Api}/v8/artifacts/${id}-stream?teamId=${team}`, {
+  const noLength = await fetch(`${r2Api}/v8/artifacts/${id}-stream?teamId=${encodedTeam}`, {
     body: new ReadableStream({
       start(controller) {
         controller.enqueue(new Uint8Array(1024 * 1024 + 1));
@@ -114,7 +118,7 @@ await check("r2 upload validation", async () => {
 
 await check("r2 cache api invalidates on overwrite", async () => {
   const id = `cache-${Date.now()}`;
-  const url = `${r2Api}/v8/artifacts/${id}?teamId=${team}`;
+  const url = `${r2Api}/v8/artifacts/${id}?teamId=${encodedTeam}`;
   const encoder = new TextEncoder();
   const oldBytes = encoder.encode("old");
   const oldPut = await putBytes(url, oldBytes);
@@ -134,9 +138,11 @@ await check("r2 branch fallback", async () => {
   const id = `branch-${Date.now()}`;
   const encoder = new TextEncoder();
   const bytes = encoder.encode("main");
-  const put = await putBytes(`${r2Api}/v8/artifacts/${id}?teamId=${team}`, bytes);
+  const put = await putBytes(`${r2Api}/v8/artifacts/${id}?teamId=${encodedTeam}`, bytes);
   assertStatus(put, 200);
-  const response = await authedFetch(`${r2Api}/v8/artifacts/${id}?teamId=${team}&branch=pr-1`);
+  const response = await authedFetch(
+    `${r2Api}/v8/artifacts/${id}?teamId=${encodedTeam}&branch=pr-1`,
+  );
   assertStatus(response, 200);
   const text = await response.text();
   assertText(text, "main");
@@ -159,7 +165,7 @@ await check("d1 token admin create duplicate revoke", async () => {
   });
   assertStatus(duplicate, 409);
   const createdTokenPut = await fetch(
-    `${r2Api}/v8/artifacts/d1-token-${Date.now()}?teamId=${team}`,
+    `${r2Api}/v8/artifacts/d1-token-${Date.now()}?teamId=${encodedTeam}`,
     {
       body: new Uint8Array([7]),
       headers: { Authorization: `Bearer ${rawToken}`, "Content-Type": "application/octet-stream" },
@@ -179,11 +185,11 @@ await check("d1 token admin create duplicate revoke", async () => {
 });
 
 await check("internal stats and purge", async () => {
-  const stats = await adminFetch(`${r2Api}/internal/teams/${encodeURIComponent(team)}/stats`);
+  const stats = await adminFetch(`${r2Api}/internal/teams/${encodedTeam}/stats`);
   assertStatus(stats, 200);
   const statsBody = await stats.json();
   assert(statsBody.objects > 0, `expected objects before purge, got ${JSON.stringify(statsBody)}`);
-  const purge = await adminFetch(`${r2Api}/internal/teams/${encodeURIComponent(team)}/purge-all`, {
+  const purge = await adminFetch(`${r2Api}/internal/teams/${encodedTeam}/purge-all`, {
     method: "POST",
   });
   assertStatus(purge, 200);
@@ -197,7 +203,7 @@ await check("internal stats and purge", async () => {
 
 await check("kv put head get lookup purge", async () => {
   const id = `kv-${Date.now()}`;
-  const url = `${kvApi}/v8/artifacts/${id}?teamId=${team}`;
+  const url = `${kvApi}/v8/artifacts/${id}?teamId=${encodedTeam}`;
   const encoder = new TextEncoder();
   const bytes = encoder.encode("hello-kv");
   const put = await putBytes(url, bytes);
@@ -207,7 +213,7 @@ await check("kv put head get lookup purge", async () => {
   const get = await authedFetch(url);
   const text = await get.text();
   assertText(text, "hello-kv");
-  const lookup = await authedFetch(`${kvApi}/v8/artifacts?teamId=${team}`, {
+  const lookup = await authedFetch(`${kvApi}/v8/artifacts?teamId=${encodedTeam}`, {
     body: JSON.stringify({ hashes: [id] }),
     headers: { "Content-Type": "application/json" },
     method: "POST",
@@ -215,7 +221,6 @@ await check("kv put head get lookup purge", async () => {
   assertStatus(lookup, 200);
   const body = await lookup.json();
   assert(body[id]?.size === 8, `bad kv lookup ${JSON.stringify(body)}`);
-  const encodedTeam = encodeURIComponent(team);
   const purge = await adminFetch(`${kvApi}/internal/teams/${encodedTeam}/purge-all`, {
     method: "POST",
   });

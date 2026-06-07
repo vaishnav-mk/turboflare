@@ -12,6 +12,7 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(SCRIPT_DIR, "..", "..");
 const FIXTURE_ROOT = join(REPO_ROOT, "fixtures", "complex-turbo-monorepo");
 const token = requiredEnv("TURBOFLARE_TOKEN");
+const adminToken = requiredEnv("TURBOFLARE_ADMIN_TOKEN");
 const baseHost = requiredEnv("TURBOFLARE_HOST");
 const versions = (process.env.TURBOFLARE_TURBO_VERSIONS ?? "2.6.1,2.9.16").split(",");
 const protocols = ["http", "https"];
@@ -37,7 +38,9 @@ for (const version of versions) {
         ok: false,
       });
     } finally {
-      await purge(api, team).catch(() => undefined);
+      await purge(api, team).catch((error) => {
+        console.error(error instanceof Error ? error.message : String(error));
+      });
       await rm(fixture, { force: true, recursive: true });
     }
   }
@@ -113,10 +116,13 @@ function run(command, args, cwd, env = {}) {
 }
 
 async function purge(api, team) {
-  await fetch(`${api}/internal/teams/${encodeURIComponent(team)}/purge-all`, {
-    headers: { Authorization: "Bearer matrix-admin-20260607" },
+  const response = await fetch(`${api}/internal/teams/${encodeURIComponent(team)}/purge-all`, {
+    headers: { Authorization: `Bearer ${adminToken}` },
     method: "POST",
   });
+  if (!response.ok) {
+    throw new Error(`purge failed for ${team}: ${response.status}`);
+  }
 }
 
 function summary(value) {
