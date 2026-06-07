@@ -14,53 +14,76 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  internal:
-    name: ${{ matrix.name }}
+  oxfmt:
+    name: oxfmt
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: oxfmt
-            command: pnpm format:check
-          - name: oxlint
-            command: pnpm lint
-          - name: typecheck
-            command: pnpm typecheck
-          - name: tests
-            command: pnpm test
-          - name: integration
-            command: pnpm test:integration
-          - name: build
-            command: pnpm build
-          - name: r2 lifecycle dry-run
-            command: pnpm r2:lifecycle:dry-run
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 11.5.0
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: ${{ matrix.command }}
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm format:check
+
+  oxlint:
+    name: oxlint
+    runs-on: ubuntu-latest
+    needs: [oxfmt]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm lint
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    needs: [oxlint]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm typecheck
+
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+    needs: [typecheck]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm test
+
+  integration:
+    name: integration
+    runs-on: ubuntu-latest
+    needs: [typecheck]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm test:integration
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    needs: [typecheck]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm build
+
+  r2-lifecycle-dry-run:
+    name: r2 lifecycle dry-run
+    runs-on: ubuntu-latest
+    needs: [tests, integration, build]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm r2:lifecycle:dry-run
 
   without-remote:
     name: without turborepo
     runs-on: ubuntu-latest
     if: github.repository == 'vaishnav-mk/turboflare' && github.event_name != 'pull_request' && vars.TURBOFLARE_REMOTE_API != ''
+    needs: [r2-lifecycle-dry-run]
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 11.5.0
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-pnpm
       - name: build (no cache)
         run: node scripts/ci/profile-build.mjs --mode no-cache
       - uses: actions/upload-artifact@v7
@@ -73,16 +96,10 @@ jobs:
     name: with turborepo (seed)
     runs-on: ubuntu-latest
     if: github.repository == 'vaishnav-mk/turboflare' && github.event_name != 'pull_request' && vars.TURBOFLARE_REMOTE_API != ''
+    needs: [r2-lifecycle-dry-run]
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 11.5.0
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-pnpm
       - name: cold build + upload
         run: node scripts/ci/profile-build.mjs --mode seed
         env:
@@ -102,14 +119,7 @@ jobs:
     needs: [seed-remote]
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 11.5.0
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-pnpm
       - name: rebuild from remote cache
         run: node scripts/ci/profile-build.mjs --mode rebuild
         env:
@@ -154,16 +164,10 @@ jobs:
     name: dogfood remote cache
     runs-on: ubuntu-latest
     if: github.repository == 'vaishnav-mk/turboflare' && github.event_name != 'pull_request' && vars.TURBOFLARE_REMOTE_API != ''
+    needs: [r2-lifecycle-dry-run]
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 11.5.0
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-pnpm
       - run: node scripts/ci/dogfood-remote-cache.mjs
         env:
           INTERNAL_ADMIN_TOKEN: ${{ secrets.TURBOFLARE_INTERNAL_ADMIN_TOKEN }}
