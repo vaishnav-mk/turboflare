@@ -1,5 +1,7 @@
 # Turboflare
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/vaishnav-mk/turboflare)
+
 Turboflare is a speed-first, Cloudflare-native remote cache for Turborepo.
 
 It is designed to be compatible with Turborepo's `/v8/artifacts` remote cache protocol while using Cloudflare Workers, R2, Cache API, Analytics Engine, Rate Limiting, D1, and optional KV artifact storage.
@@ -203,10 +205,35 @@ Use R2 `Standard` storage for cache artifacts. Turborepo cache artifacts are usu
 
 ## Deployment
 
+### One-Click Deploy
+
+Use the button at the top of this README to deploy from GitHub. The root `deploy` script creates the configured R2 bucket if it does not exist, then deploys the Worker from `apps/cache-worker/wrangler.jsonc`.
+
+After deployment, set at least one Turbo bearer token as a Worker secret:
+
+```sh
+wrangler secret put TURBO_TOKEN --config apps/cache-worker/wrangler.jsonc
+```
+
+Set `INTERNAL_ADMIN_TOKEN` only if you want to use `/internal/*` admin routes:
+
+```sh
+wrangler secret put INTERNAL_ADMIN_TOKEN --config apps/cache-worker/wrangler.jsonc
+```
+
+Point Turborepo at your deployed Worker:
+
+```sh
+export TURBO_API="https://<worker-name>.<subdomain>.workers.dev"
+export TURBO_TOKEN="<same token>"
+export TURBO_TEAM="team-name"
+turbo run build
+```
+
 Minimal Worker deployment:
 
 ```sh
-pnpm --filter @turboflare/cache-worker run deploy
+pnpm deploy
 ```
 
 Apply optional D1 schema files only for the features you bind:
@@ -216,26 +243,10 @@ wrangler d1 execute <token-db-name> --file apps/cache-worker/schema/001_tokens.s
 wrangler d1 execute <artifact-index-db-name> --file apps/cache-worker/schema/002_artifact_index.sql
 ```
 
-Apply R2 lifecycle rules after creating the bucket:
+Optionally apply R2 lifecycle rules after deployment:
 
 ```sh
 CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=... pnpm r2:lifecycle
-```
-
-Set secrets out of band:
-
-```sh
-wrangler secret put TURBO_TOKEN --config apps/cache-worker/wrangler.jsonc
-wrangler secret put INTERNAL_ADMIN_TOKEN --config apps/cache-worker/wrangler.jsonc
-```
-
-Turbo client environment:
-
-```sh
-export TURBO_API="https://cache.example.com"
-export TURBO_TOKEN="..."
-export TURBO_TEAM="team-name"
-turbo run build
 ```
 
 Expose `/v8/*` publicly behind Turbo bearer auth. Keep `/internal/*` private and set a separate `INTERNAL_ADMIN_TOKEN`; internal routes fail closed when it is missing.

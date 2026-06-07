@@ -30,7 +30,7 @@ jobs:
   dogfood:
     name: dogfood remote cache
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request'
+    if: github.repository == 'vaishnav-mk/turboflare' && github.event_name != 'pull_request'
     steps:
       - uses: actions/checkout@v6
 
