@@ -42,7 +42,7 @@ rm -rf .turbo
 turbo run build --cache=local:,remote:r
 ```
 
-The second run should report `cache hit`. If Turbo says it cannot connect over HTTPS but `curl` works, your network may be intercepting TLS with a certificate that Turbo's rustls client rejects. Try `http://<worker-name>.<subdomain>.workers.dev`, disable TLS inspection for the Worker host, or use a custom HTTPS domain.
+The second run should report `cache hit`. If Turbo says it cannot connect over HTTPS but `curl` works, your network may be intercepting TLS with a certificate that Turbo's rustls client rejects. Prefer a custom HTTPS domain or exclude the Worker host from TLS inspection. Use plaintext HTTP only for diagnosis with a throwaway token, then rotate it.
 
 Manual deploy:
 

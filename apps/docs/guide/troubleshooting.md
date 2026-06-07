@@ -15,18 +15,18 @@ Expected:
 
 ## Common issues
 
-| Symptom                                         | Likely cause                                                 | Fix                                                                                               |
-| ----------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `401` on `/v8/artifacts/status`                 | missing/wrong bearer token                                   | set matching Worker secret and client env                                                         |
-| `403` on upload                                 | token lacks write scope                                      | check scoped token `scopes`                                                                       |
-| `403` on team                                   | token cannot access team                                     | check `TURBO_TEAM` and token `teams`                                                              |
-| `403` on PR write                               | `read-only-pr` policy                                        | use main branch or change policy                                                                  |
-| `411` in KV mode                                | missing `Content-Length`                                     | use R2 or send `Content-Length`                                                                   |
-| `413` in KV mode                                | artifact above KV limit                                      | use R2                                                                                            |
-| no cache hits                                   | different task hash                                          | inspect Turbo inputs, env, git dirty state                                                        |
-| internal route `503`                            | admin token or optional DB missing                           | configure `INTERNAL_ADMIN_TOKEN`, `TOKEN_DB`, or `ARTIFACT_INDEX`                                 |
-| lifecycle fails                                 | Cloudflare API settings                                      | check account id, API token, bucket name, jurisdiction                                            |
-| Turbo says `Could not connect` but `curl` works | TLS inspection certificate rejected by Turbo's rustls client | try `http://<worker>.workers.dev`, a custom HTTPS domain, or exclude the host from TLS inspection |
+| Symptom                                         | Likely cause                                                 | Fix                                                                                                     |
+| ----------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `401` on `/v8/artifacts/status`                 | missing/wrong bearer token                                   | set matching Worker secret and client env                                                               |
+| `403` on upload                                 | token lacks write scope                                      | check scoped token `scopes`                                                                             |
+| `403` on team                                   | token cannot access team                                     | check `TURBO_TEAM` and token `teams`                                                                    |
+| `403` on PR write                               | `read-only-pr` policy                                        | use main branch or change policy                                                                        |
+| `411` in KV mode                                | missing `Content-Length`                                     | use R2 or send `Content-Length`                                                                         |
+| `413` in KV mode                                | artifact above KV limit                                      | use R2                                                                                                  |
+| no cache hits                                   | different task hash                                          | inspect Turbo inputs, env, git dirty state                                                              |
+| internal route `503`                            | admin token or optional DB missing                           | configure `INTERNAL_ADMIN_TOKEN`, `TOKEN_DB`, or `ARTIFACT_INDEX`                                       |
+| lifecycle fails                                 | Cloudflare API settings                                      | check account id, API token, bucket name, jurisdiction                                                  |
+| Turbo says `Could not connect` but `curl` works | TLS inspection certificate rejected by Turbo's rustls client | use a custom HTTPS domain or exclude the host from TLS inspection; use HTTP only with a throwaway token |
 
 ## Verify live Worker auth
 

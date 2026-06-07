@@ -6,7 +6,7 @@ Turborepo remote cache should be boring infrastructure: deploy it, set a token, 
 | ------------------------ | --------------------------------------------------- |
 | Fast global reads        | Cloudflare Workers + optional Cache API             |
 | Durable artifact storage | R2 as source of truth                               |
-| Simple auth              | static tokens first, scoped/D1 tokens later         |
+| Simple auth              | static tokens, scoped tokens, optional D1 tokens    |
 | Ops control              | R2 lifecycle, bounded cleanup, internal purge/stats |
 | Stock Turbo support      | `/v8/artifacts` plus `/v2` team discovery           |
 

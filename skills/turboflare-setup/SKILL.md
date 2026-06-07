@@ -65,7 +65,7 @@ pnpm --filter @turboflare/cache-worker deploy
 6. Run a real Turbo smoke from a real Turborepo workspace:
 
 ```sh
-export TURBO_API="http://<worker>.<subdomain>.workers.dev"
+export TURBO_API="https://<worker>.<subdomain>.workers.dev"
 export TURBO_TOKEN="<redacted>"
 export TURBO_TEAM="<team-or-smoke-id>"
 
@@ -74,7 +74,7 @@ rm -rf .turbo
 turbo run build --cache=local:,remote:r
 ```
 
-Use `http://*.workers.dev` for `TURBO_API` until the HTTPS direct-to-`workers.dev` Turbo-client issue is resolved. Direct HTTP worked in remote validation; direct HTTPS from Turbo failed locally with “Could not connect”, while normal HTTPS fetches and an HTTP proxy to HTTPS both worked.
+Use HTTPS for `TURBO_API`. If direct HTTPS to `workers.dev` fails only in Turbo with “Could not connect”, prefer a custom HTTPS domain or exclude the host from TLS inspection. Use HTTP only for diagnosis with a throwaway token, then rotate it.
 
 7. Report the exact result:
 
@@ -82,7 +82,7 @@ Use `http://*.workers.dev` for `TURBO_API` until the HTTPS direct-to-`workers.de
 remote write: pass/fail
 remote read: pass/fail
 cache hits: <n>/<n>
-TURBO_API: http://...
+TURBO_API: https://...
 TURBO_TEAM: ...
 ```
 
@@ -112,7 +112,7 @@ Real Turbo client:
 - First run with `--cache=local:,remote:w` executes tasks and uploads artifacts.
 - Clear local cache/generated outputs.
 - Second run with `--cache=local:,remote:r` shows remote `cache hit`.
-- If direct HTTPS `TURBO_API` fails but HTTP works, document that exactly; do not claim the Worker protocol is broken.
+- If direct HTTPS `TURBO_API` fails but HTTP works with a throwaway token, document that exactly; do not claim the Worker protocol is broken.
 
 Admin cleanup:
 
@@ -184,7 +184,7 @@ Use when the user wants read acceleration.
 Check these in order:
 
 - `TURBO_API` includes protocol and no `/v8` suffix.
-- Try `http://<worker>.<subdomain>.workers.dev` if direct HTTPS fails.
+- Prefer a custom HTTPS domain or exclude the Worker host from TLS inspection if direct HTTPS fails.
 - `TURBO_TOKEN` matches Worker secret.
 - `TURBO_TEAM`, `TURBO_TEAMID`, or `team` is set.
 - `GET $TURBO_API/v8/artifacts/status` works with bearer auth.
