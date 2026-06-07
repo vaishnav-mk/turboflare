@@ -73,6 +73,7 @@ jobs:
   rebuild-remote:
     name: with turborepo (rebuild)
     runs-on: ubuntu-latest
+    if: github.repository == 'vaishnav-mk/turboflare' && github.event_name != 'pull_request'
     needs: [seed-remote]
     steps:
       - uses: actions/checkout@v6

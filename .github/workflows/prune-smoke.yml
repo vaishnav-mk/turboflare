@@ -26,9 +26,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: node scripts/ci/prune-smoke.mjs "${{ inputs.target }}"
+      - run: node scripts/ci/prune-smoke.mjs "$TARGET"
         env:
           PRUNE_CWD: fixtures/complex-turbo-monorepo
+          TARGET: ${{ inputs.target }}
           TURBO_API: https://turboflare-cache-worker.wishee.workers.dev
           TURBO_TEAM: prune-${{ github.run_id }}
           TURBO_TOKEN: ${{ secrets.TURBOFLARE_REMOTE_TOKEN }}
