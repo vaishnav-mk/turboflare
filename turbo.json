@@ -1,19 +1,20 @@
 {
-	"$schema": "https://turbo.build/schema.json",
-	"globalDependencies": ["scripts/fixtures/**"],
-	"tasks": {
-		"build": {
-			"dependsOn": ["^build"],
-			"outputs": []
-		},
-		"test": {
-			"dependsOn": ["^build"]
-		},
-		"test:integration": {
-			"dependsOn": ["^build"]
-		},
-		"typecheck": {
-			"dependsOn": ["^typecheck"]
-		}
-	}
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["scripts/fixtures/**"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "lint": {},
+    "test": {
+      "dependsOn": ["^build"]
+    },
+    "test:integration": {
+      "dependsOn": ["^build"]
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck"]
+    }
+  }
 }

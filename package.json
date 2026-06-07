@@ -1,25 +1,31 @@
 {
-	"name": "turboflare",
-	"version": "0.0.0",
-	"private": true,
-	"type": "module",
-	"packageManager": "pnpm@11.5.0",
-	"scripts": {
-		"build": "turbo run build",
-		"check": "pnpm typecheck && pnpm test && pnpm test:integration && pnpm build && pnpm r2:lifecycle:dry-run",
-		"deploy": "node scripts/deploy/cloudflare.mjs",
-		"docs:build": "pnpm --filter @turboflare/docs build",
-		"docs:dev": "pnpm --filter @turboflare/docs dev",
-		"dev": "pnpm --filter @turboflare/cache-worker dev",
-		"prune:smoke": "node scripts/ci/prune-smoke.mjs",
-		"r2:lifecycle": "node scripts/r2/put-lifecycle.mjs",
-		"r2:lifecycle:dry-run": "node scripts/r2/put-lifecycle.mjs --dry-run",
-		"test": "turbo run test",
-		"test:integration": "turbo run test:integration",
-		"typecheck": "turbo run typecheck"
-	},
-	"devDependencies": {
-		"turbo": "^2.6.1",
-		"typescript": "^6.0.3"
-	}
+  "name": "turboflare",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "turbo run build",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm test:integration && pnpm build && pnpm r2:lifecycle:dry-run",
+    "deploy": "node scripts/deploy/cloudflare.mjs",
+    "docs:build": "pnpm --filter @turboflare/docs build",
+    "docs:dev": "pnpm --filter @turboflare/docs dev",
+    "dev": "pnpm --filter @turboflare/cache-worker dev",
+    "format": "oxfmt . '!apps/docs/dist/**' '!fixtures/complex-turbo-monorepo/**'",
+    "format:check": "oxfmt --check . '!apps/docs/dist/**' '!fixtures/complex-turbo-monorepo/**'",
+    "lint": "oxlint . --ignore-pattern apps/docs/dist --ignore-pattern fixtures/complex-turbo-monorepo --deny-warnings",
+    "lint:fix": "oxlint . --ignore-pattern apps/docs/dist --ignore-pattern fixtures/complex-turbo-monorepo --fix",
+    "prune:smoke": "node scripts/ci/prune-smoke.mjs",
+    "r2:lifecycle": "node scripts/r2/put-lifecycle.mjs",
+    "r2:lifecycle:dry-run": "node scripts/r2/put-lifecycle.mjs --dry-run",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.53.0",
+    "oxlint": "^1.68.0",
+    "turbo": "^2.6.1",
+    "typescript": "^6.0.3"
+  },
+  "packageManager": "pnpm@11.5.0"
 }
