@@ -44,24 +44,24 @@ const md = `# Turboflare CI Cache Benchmark
 | Task | Duration | Cache |
 | --- | ---: | --- |
 ${taskRows(noCache.tasks)}
-| **Total (turbo)** | **${fmt(noCache.turboMs)}** | |
-| **Total (wall)** | **${fmt(noCache.wallMs)}** | |
+| **Total (turbo)** | **${fmt(noCache.turboMs)}** | — |
+| **Total (wall)** | **${fmt(noCache.wallMs)}** | — |
 
 ## Per-task breakdown: Seed (cold + upload)
 
 | Task | Duration | Cache |
 | --- | ---: | --- |
 ${taskRows(seed.tasks)}
-| **Total (turbo)** | **${fmt(seed.turboMs)}** | |
-| **Total (wall)** | **${fmt(seed.wallMs)}** | |
+| **Total (turbo)** | **${fmt(seed.turboMs)}** | — |
+| **Total (wall)** | **${fmt(seed.wallMs)}** | — |
 
 ## Per-task breakdown: Rebuild (remote cache)
 
 | Task | Duration | Cache | Time saved |
 | --- | ---: | --- | ---: |
 ${taskRows(rebuild.tasks, true)}
-| **Total (turbo)** | **${fmt(rebuild.turboMs)}** | | |
-| **Total (wall)** | **${fmt(rebuildWall)}** | | |
+| **Total (turbo)** | **${fmt(rebuild.turboMs)}** | — | — |
+| **Total (wall)** | **${fmt(rebuildWall)}** | — | — |
 
 ## How this works
 
@@ -87,7 +87,7 @@ function taskRows(tasks, showSaved = false) {
 		return showSaved
 			? `| \`${t.taskId}\` | ${fmt(t.durationMs)} | ${status} | ${saved} |`
 			: `| \`${t.taskId}\` | ${fmt(t.durationMs)} | ${status} |`;
-	}).join("\n") + "\n";
+	}).join("\n");
 }
 
 function fmt(ms) {
