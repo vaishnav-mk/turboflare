@@ -9,7 +9,6 @@ import { MetricEvent } from "../observability/types";
 import { enforceRateLimit } from "../rate-limit/enforce";
 import { handleVercelCompatibility } from "../routes/compat/vercel";
 import { handleInternal } from "../routes/internal/router";
-import { handleManagementHealth } from "../routes/management/health";
 import { handleArtifact } from "../routes/v8/artifacts";
 import { handleArtifactLookup } from "../routes/v8/batch";
 import { handleEvents } from "../routes/v8/events";
@@ -31,9 +30,8 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
 		});
 	}
 
-	const health = handleManagementHealth(request);
-	if (health !== null) {
-		return health;
+	if (request.method === "GET" && url.pathname === "/management/health") {
+		return new Response(null, { status: 200 });
 	}
 
 	const internal = await handleInternal(request, env);

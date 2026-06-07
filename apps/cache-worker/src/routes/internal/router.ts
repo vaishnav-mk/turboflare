@@ -2,7 +2,6 @@ import type { Env } from "../../app/env";
 import { requireInternalAdmin } from "../../auth/internal";
 import { errorResponse, methodNotAllowed } from "../../http/response";
 import { handleInternalArtifacts } from "./artifacts";
-import { handleInternalHealth } from "./health";
 import { handleInternalTeam } from "./team";
 import { handleInternalTokens } from "./tokens";
 
@@ -17,9 +16,8 @@ export async function handleInternal(request: Request, env: Env): Promise<Respon
 		return adminError;
 	}
 
-	const health = handleInternalHealth(request);
-	if (health !== null) {
-		return health;
+	if (url.pathname === "/internal/health") {
+		return request.method === "GET" ? new Response(null, { status: 200 }) : methodNotAllowed(["GET"]);
 	}
 
 	const team = await handleInternalTeam(request, env);
@@ -35,10 +33,6 @@ export async function handleInternal(request: Request, env: Env): Promise<Respon
 	const tokens = await handleInternalTokens(request, env);
 	if (tokens !== null) {
 		return tokens;
-	}
-
-	if (url.pathname === "/internal/health") {
-		return methodNotAllowed(["GET"]);
 	}
 
 	return errorResponse(404, "not_found", "Not found");
