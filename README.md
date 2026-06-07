@@ -189,19 +189,7 @@ Optional Worker variables and bindings:
 - `CLEANUP_MAX_DELETE` caps scheduled deletions per run. The default is `1000`.
 - `ABORT_MULTIPART_DAYS` controls the R2 lifecycle rule for stale multipart uploads when running `pnpm r2:lifecycle`. The default is `1`.
 
-## Cache Warmup and Prune Smoke
-
-Warm the remote cache without reading local cache:
-
-```sh
-TURBO_API=... TURBO_TOKEN=... TURBO_TEAM=main pnpm cache:warm
-```
-
-Optional filters and tasks:
-
-```sh
-TURBO_WARM_TASKS="build test" TURBO_WARM_FILTERS="web...,api..." pnpm cache:warm
-```
+## Prune Smoke
 
 Verify a pruned Docker workspace can write and then read remote cache:
 
@@ -209,10 +197,7 @@ Verify a pruned Docker workspace can write and then read remote cache:
 PRUNE_CWD=fixtures/complex-turbo-monorepo TURBO_API=... TURBO_TOKEN=... TURBO_TEAM=prune-smoke pnpm prune:smoke web
 ```
 
-GitHub workflows are included for both paths:
-
-- `.github/workflows/cache-warm.yml`
-- `.github/workflows/prune-smoke.yml`
+`.github/workflows/prune-smoke.yml` is included as an optional manual smoke test.
 
 Use R2 `Standard` storage for cache artifacts. Turborepo cache artifacts are usually hot and short-lived, so Infrequent Access is not the default.
 
