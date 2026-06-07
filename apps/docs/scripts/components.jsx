@@ -107,18 +107,18 @@ function Topbar({ current, pages, hrefFor }) {
 			<nav className="topbar-nav">
 				<a href="/" className="crumb-link">Docs</a>
 				<span className="crumb-sep">/</span>
-				<select className="crumb-select" onChange="var s=this.value;var o=this.querySelector('option[value=\\''+s+'\\']');if(o&&o.dataset.href)location.href=o.dataset.href">
+				<select className="crumb-select" defaultValue={currentSection} onChange="var s=this.value;var o=this.querySelector('option[value=\\''+s+'\\']');if(o&&o.dataset.href)location.href=o.dataset.href">
 					{sections.map((s) => {
 						const first = pages.find((p) => p.section === s && !p.parent);
-						return <option key={s} value={s} selected={s === currentSection || undefined} data-href={first ? hrefFor(first) : "/"}>{s}</option>;
+						return <option key={s} value={s} data-href={first ? hrefFor(first) : "/"}>{s}</option>;
 					})}
 				</select>
 				<span className="crumb-sep">/</span>
-				<select className="crumb-select crumb-page" onChange="location.href=this.value">
+				<select className="crumb-select crumb-page" defaultValue={hrefFor(current)} onChange="location.href=this.value">
 					{sectionPages.map((p) => {
 						const group = p.children ? [p, ...p.children] : [p];
 						return group.map((g) => (
-							<option key={g.output} value={hrefFor(g)} selected={g.output === current.output || undefined}>{g.parent ? `\u00A0\u00A0${g.title}` : g.title}</option>
+							<option key={g.output} value={hrefFor(g)}>{g.parent ? `\u00A0\u00A0${g.title}` : g.title}</option>
 						));
 					})}
 				</select>

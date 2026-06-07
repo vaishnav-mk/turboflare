@@ -10,6 +10,8 @@ Turbo routes use:
 Authorization: Bearer <TURBO_TOKEN>
 ```
 
+`PUT /v8/artifacts/:artifactId` requires write scope. Status, lookup, events, `GET`, `HEAD`, and `/v2` compatibility routes require read scope.
+
 Internal routes use:
 
 ```txt
@@ -90,6 +92,20 @@ Response:
 ### `POST /v8/artifacts/events`
 
 Accepts Turbo hit/miss events.
+
+Request body:
+
+```json
+[
+  {
+    "event": "HIT",
+    "source": "REMOTE",
+    "hash": "abc",
+    "duration": 123,
+    "sessionId": "optional"
+  }
+]
+```
 
 Response:
 

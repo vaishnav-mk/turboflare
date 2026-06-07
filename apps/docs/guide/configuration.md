@@ -34,7 +34,7 @@ Default R2 binding:
 | `RETENTION_DAYS` | number | `30` | Worker cleanup and lifecycle default |
 | `BRANCH_RETENTION_DAYS` | number | `RETENTION_DAYS` | shorter branch cleanup |
 | `CLEANUP_MAX_DELETE` | number | `1000` | max deletes per scheduled cleanup |
-| `MAX_ARTIFACT_BYTES` | bytes | `0` | upload cap when `Content-Length` exists |
+| `MAX_ARTIFACT_BYTES` | bytes | `524288000` | upload cap when `Content-Length` exists |
 | `CACHE_API_READS` | `true`, `false` | `false` | fill Cloudflare Cache API after R2 reads |
 | `CACHE_API_MAX_BYTES` | bytes | `10485760` | largest Cache API-eligible artifact |
 | `ARTIFACT_STORE` | `r2`, `kv` | `r2` | choose R2 or KV artifact store |
@@ -48,6 +48,17 @@ Default R2 binding:
 | `ANALYTICS` | Analytics Engine metrics |
 | `RATE_LIMITER` | Cloudflare Rate Limiting binding |
 | `ARTIFACTS_KV` | KV artifact store when `ARTIFACT_STORE=kv` |
+
+These bindings are independent. The smallest production setup is still just `ARTIFACTS` plus `TURBO_TOKEN`.
+
+| Binding | Source of truth? | Why it exists |
+| --- | --- | --- |
+| `ARTIFACTS` | yes | stores artifact bodies and metadata in R2 |
+| `ARTIFACTS_KV` | yes, only in KV mode | explicit small-artifact fallback when `ARTIFACT_STORE=kv` |
+| `TOKEN_DB` | yes for dynamic tokens | stores hashed tokens, scopes, teams, expiration, and revocation state |
+| `ARTIFACT_INDEX` | no | queryable D1 metadata for admin/search/reporting; uploads still succeed if index writes fail |
+| `ANALYTICS` | no | append-only metrics for traffic, hits, misses, bytes, tenants, and tokens |
+| `RATE_LIMITER` | no | optional request guardrail for hosted or multi-tenant deployments |
 
 ## Routes
 

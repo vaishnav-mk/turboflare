@@ -39,6 +39,15 @@ Choose a location close to the CI runners or users that will read/write most oft
 
 R2 is durable object storage, not a global KV. Cache API reads can add edge acceleration, but R2 remains source of truth.
 
+Why R2 is the default:
+
+| R2 property | Why it matters for Turbo cache |
+| --- | --- |
+| streaming `put()` and `get()` | artifact bodies do not need to be buffered by route code |
+| `head()` support | `HEAD` and batch lookup can read metadata without downloading the artifact body |
+| lifecycle rules | old artifacts can expire without Worker CPU |
+| large object support | real monorepo artifacts can exceed KV limits |
+
 ## Object keys
 
 Default key:
@@ -132,7 +141,10 @@ Bind `ARTIFACTS_KV` when using it.
 | --- | --- |
 | streams uploads/downloads | buffers upload body |
 | supports large artifacts | 25 MiB value cap |
+| metadata-only `head()` | `getWithMetadata()` reads the stored value |
 | R2 lifecycle support | Worker cleanup only |
 | recommended default | small-artifact fallback |
 
 KV uploads require `Content-Length`.
+
+KV mode is useful for testing or very small artifacts, but it is not the recommended production store. The Worker keeps the same `/v8` protocol in both modes; only the artifact backend changes.

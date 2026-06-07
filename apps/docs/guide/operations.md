@@ -41,6 +41,10 @@ wrangler d1 execute <artifact-index-db-name> --file apps/cache-worker/schema/002
 
 Index writes run after upload with `ctx.waitUntil()`. Upload correctness does not depend on index writes.
 
+The artifact index is not the cache source of truth. It exists so operators can query metadata that is awkward to query from R2 object listings alone: object key, team, artifact id, size, duration, signature tag, git SHA, dirty hash, token id, and timestamps.
+
+Use it when you want admin/search/reporting features. Skip it for the smallest Worker + R2 deployment.
+
 ## Analytics Engine
 
 Bind `ANALYTICS` to record non-blocking datapoints for status, preflight, upload, hit, miss, and event requests.
@@ -52,6 +56,8 @@ Metric shape:
 | index | tenant key |
 | blobs | event, method, tenant, artifact sample, token id |
 | doubles | status, bytes, timestamp |
+
+Analytics Engine is append-only observability. It should not be used as the artifact inventory or token database.
 
 ## Rate limiting
 
@@ -68,6 +74,8 @@ Status requests without a tenant use:
 ```txt
 token:{tokenId}
 ```
+
+This is optional. It is most useful when one Turboflare deployment is shared across many teams or exposed to untrusted clients.
 
 ## Read-only mode
 

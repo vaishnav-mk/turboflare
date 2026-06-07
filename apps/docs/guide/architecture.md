@@ -1,6 +1,6 @@
 # Architecture
 
-Turboflare keeps the hot path intentionally small: authenticate, resolve tenant, construct a storage key, stream R2.
+Turboflare keeps the hot path intentionally small: authenticate, resolve tenant, construct a storage key, stream the artifact store. In the default setup, that store is R2.
 
 ![Turboflare request flow](/diagrams/request-flow.svg)
 
@@ -51,6 +51,8 @@ HEAD /v8/artifacts/:artifactId
   -> return metadata headers without reading object body
 ```
 
+KV mode uses the same routing and key model, but it is an explicit fallback. KV buffers uploads, caps values at 25 MiB, and cannot do metadata-only `HEAD` without reading the stored value. R2 is recommended for real cache artifacts.
+
 ## Storage key design
 
 Default:
@@ -86,6 +88,20 @@ Cache API entry exists -> faster read path
 D1 index row exists -> admin/search metadata
 Analytics datapoint exists -> reporting only
 ```
+
+## Optional Cloudflare products
+
+| Product | Binding | Why it is used |
+| --- | --- | --- |
+| R2 | `ARTIFACTS` | durable, streaming artifact storage; default source of truth |
+| KV | `ARTIFACTS_KV` | explicit small-artifact fallback for simple experiments |
+| D1 | `TOKEN_DB` | dynamic token auth: hashed tokens, teams, scopes, expiry, revocation, audit log |
+| D1 | `ARTIFACT_INDEX` | queryable artifact metadata for admin/search/reporting; not required for cache hits |
+| Cache API | none | optional edge acceleration for small repeated reads |
+| Analytics Engine | `ANALYTICS` | non-blocking metrics for hit/miss/status/upload/event traffic |
+| Rate Limiting | `RATE_LIMITER` | optional per-token or per-team request limiting |
+
+Each optional binding can fail closed or be absent without changing the default Worker + R2 cache behavior. Artifact bodies live in R2/KV. Token state lives in D1 only when `TOKEN_DB` is enabled. Metrics live in Analytics Engine only when `ANALYTICS` is bound.
 
 ## Why not pre-warm?
 

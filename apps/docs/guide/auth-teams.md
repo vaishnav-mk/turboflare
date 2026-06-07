@@ -44,7 +44,7 @@ Use `TURBO_TOKEN_SCOPES` for team-limited or read-only tokens.
 
 ## D1 tokens
 
-Use D1 tokens when you need token rotation and revocation without redeploying Worker secrets.
+Use D1 tokens when you need token rotation, team scoping, expiration, or revocation without redeploying Worker secrets.
 
 1. Bind `TOKEN_DB`.
 2. Apply schema:
@@ -57,6 +57,10 @@ wrangler d1 execute <token-db-name> --file apps/cache-worker/schema/001_tokens.s
 4. Use `/internal/tokens` routes.
 
 Token hashes are lowercase hex SHA-256 of raw tokens. Raw tokens are returned only once when created.
+
+D1 is used here because token auth is structured state, not blob storage. A token row has an id, hash, teams, scopes, optional expiration, revocation timestamp, and audit entries. R2 stores artifacts; D1 stores auth records.
+
+Static tokens and D1 tokens can coexist. Authentication checks static env tokens first, then falls back to `TOKEN_DB` when it is bound.
 
 ## Internal admin token
 
@@ -91,7 +95,7 @@ Turbo can discover user/team metadata from Vercel-style endpoints.
 | `/v2/teams` | teams allowed by the token |
 | `/v2/teams/:id` | one allowed team |
 
-These routes use the same bearer auth as `/v8`.
+These routes use the same bearer auth as `/v8` and require read scope.
 
 ## Branch-aware teams
 
