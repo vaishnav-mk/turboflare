@@ -1,0 +1,28 @@
+{
+	"name": "@turboflare/docs",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "node scripts/build.mjs",
+		"dev": "node scripts/dev.mjs",
+		"preview": "node scripts/dev.mjs dist"
+	},
+	"dependencies": {
+		"@cloudflare/kumo": "2.5.0",
+		"@phosphor-icons/react": "^2.1.10",
+		"react": "^18.3.1",
+		"react-dom": "^18.3.1"
+	},
+	"devDependencies": {
+		"esbuild": "^0.28.0",
+		"marked": "^16.4.2"
+	},
+	"dependencies": {
+		"@cloudflare/kumo": "2.5.0",
+		"@phosphor-icons/react": "^2.1.10",
+		"esbuild": "^0.28.0",
+		"react": "^18.3.1",
+		"react-dom": "^18.3.1"
+	}
+}
