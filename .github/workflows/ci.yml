@@ -25,7 +25,7 @@ jobs:
   without-remote:
     name: without turborepo
     runs-on: ubuntu-latest
-    if: github.repository == 'vaishnav-mk/turboflare' && github.event_name != 'pull_request'
+    if: github.repository == 'vaishnav-mk/turboflare' && github.event_name != 'pull_request' && vars.TURBOFLARE_REMOTE_API != ''
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -47,7 +47,7 @@ jobs:
   seed-remote:
     name: with turborepo (seed)
     runs-on: ubuntu-latest
-    if: github.repository == 'vaishnav-mk/turboflare' && github.event_name != 'pull_request'
+    if: github.repository == 'vaishnav-mk/turboflare' && github.event_name != 'pull_request' && vars.TURBOFLARE_REMOTE_API != ''
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -61,7 +61,7 @@ jobs:
       - name: cold build + upload
         run: node scripts/ci/profile-build.mjs --mode seed
         env:
-          TURBO_API: https://turboflare-cache-worker.wishee.workers.dev
+          TURBO_API: ${{ vars.TURBOFLARE_REMOTE_API }}
           TURBO_TEAM: bench-${{ github.run_id }}
           TURBO_TOKEN: ${{ secrets.TURBOFLARE_REMOTE_TOKEN }}
       - uses: actions/upload-artifact@v7
@@ -73,7 +73,7 @@ jobs:
   rebuild-remote:
     name: with turborepo (rebuild)
     runs-on: ubuntu-latest
-    if: github.repository == 'vaishnav-mk/turboflare' && github.event_name != 'pull_request'
+    if: github.repository == 'vaishnav-mk/turboflare' && github.event_name != 'pull_request' && vars.TURBOFLARE_REMOTE_API != ''
     needs: [seed-remote]
     steps:
       - uses: actions/checkout@v6
@@ -88,7 +88,7 @@ jobs:
       - name: rebuild from remote cache
         run: node scripts/ci/profile-build.mjs --mode rebuild
         env:
-          TURBO_API: https://turboflare-cache-worker.wishee.workers.dev
+          TURBO_API: ${{ vars.TURBOFLARE_REMOTE_API }}
           TURBO_TEAM: bench-${{ github.run_id }}
           TURBO_TOKEN: ${{ secrets.TURBOFLARE_REMOTE_TOKEN }}
           INTERNAL_ADMIN_TOKEN: ${{ secrets.TURBOFLARE_INTERNAL_ADMIN_TOKEN }}
@@ -101,7 +101,7 @@ jobs:
   compare:
     name: compare ci profiles
     runs-on: ubuntu-latest
-    if: github.repository == 'vaishnav-mk/turboflare' && github.event_name != 'pull_request'
+    if: github.repository == 'vaishnav-mk/turboflare' && github.event_name != 'pull_request' && vars.TURBOFLARE_REMOTE_API != ''
     needs: [without-remote, seed-remote, rebuild-remote]
     steps:
       - uses: actions/checkout@v6
@@ -128,7 +128,7 @@ jobs:
   dogfood:
     name: dogfood remote cache
     runs-on: ubuntu-latest
-    if: github.repository == 'vaishnav-mk/turboflare' && github.event_name != 'pull_request'
+    if: github.repository == 'vaishnav-mk/turboflare' && github.event_name != 'pull_request' && vars.TURBOFLARE_REMOTE_API != ''
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -142,7 +142,7 @@ jobs:
       - run: node scripts/ci/dogfood-remote-cache.mjs
         env:
           INTERNAL_ADMIN_TOKEN: ${{ secrets.TURBOFLARE_INTERNAL_ADMIN_TOKEN }}
-          TURBO_API: https://turboflare-cache-worker.wishee.workers.dev
+          TURBO_API: ${{ vars.TURBOFLARE_REMOTE_API }}
           TURBO_TEAM: dogfood-${{ github.run_id }}
           TURBO_TOKEN: ${{ secrets.TURBOFLARE_REMOTE_TOKEN }}
       - uses: actions/upload-artifact@v7
