@@ -1,10 +1,10 @@
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-	test: {
-		environment: "node",
-		include: ["integration/**/*.test.ts"],
-		reporters: ["verbose"],
-		testTimeout: 60_000,
-	},
+  test: {
+    environment: "node",
+    include: ["integration/**/*.test.ts"],
+    reporters: ["verbose"],
+    testTimeout: 60_000,
+  },
 });

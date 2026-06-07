@@ -1,23 +1,23 @@
 {
-	"name": "turboflare-cache-worker",
-	"main": "src/index.ts",
-	"compatibility_date": "2026-05-07",
-	"observability": {
-		"enabled": true,
-		"head_sampling_rate": 1
-	},
-	"triggers": {
-		"crons": ["17 3 * * *"]
-	},
-	"vars": {
-		"CACHE_STATUS": "enabled",
-		"CLEANUP_MAX_DELETE": "1000",
-		"RETENTION_DAYS": "30"
-	},
-	"r2_buckets": [
-		{
-			"binding": "ARTIFACTS",
-			"bucket_name": "turboflare-artifacts"
-		}
-	]
+  "name": "turboflare-cache-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-07",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+  },
+  "triggers": {
+    "crons": ["17 3 * * *"],
+  },
+  "vars": {
+    "CACHE_STATUS": "enabled",
+    "CLEANUP_MAX_DELETE": "1000",
+    "RETENTION_DAYS": "30",
+  },
+  "r2_buckets": [
+    {
+      "binding": "ARTIFACTS",
+      "bucket_name": "turboflare-artifacts",
+    },
+  ],
 }
