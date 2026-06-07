@@ -41,11 +41,9 @@ export const PREFLIGHT_ALLOW_HEADERS = [
 	ArtifactHeader.DirtyHash,
 	ArtifactHeader.ClientCi,
 	ArtifactHeader.ClientInteractive,
-	"x-turboflare-branch",
-	"x-ai-agent",
-].join(", ");
+] as const;
 
-export const PREFLIGHT_ALLOW_METHODS = [HttpMethod.Get, HttpMethod.Head, HttpMethod.Put, HttpMethod.Post, HttpMethod.Options].join(", ");
+export const PREFLIGHT_ALLOW_METHODS = [HttpMethod.Get, HttpMethod.Head, HttpMethod.Put, HttpMethod.Post, HttpMethod.Options] as const;
 
 export enum CacheStatus {
 	Disabled = "disabled",
@@ -69,6 +67,24 @@ export interface ArtifactLookupHit {
 }
 
 export type ArtifactLookupResponse = Record<string, ArtifactLookupHit | null>;
+
+export enum CacheEventType {
+	Hit = "HIT",
+	Miss = "MISS",
+}
+
+export enum CacheEventSource {
+	Local = "LOCAL",
+	Remote = "REMOTE",
+}
+
+export interface CacheEvent {
+	duration: number;
+	event: CacheEventType;
+	hash: string;
+	sessionId?: string;
+	source: CacheEventSource;
+}
 
 const CACHE_STATUSES = new Set<string>(Object.values(CacheStatus));
 
