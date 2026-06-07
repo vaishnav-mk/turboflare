@@ -1,0 +1,20 @@
+{
+  "skill_name": "turboflare-setup",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm in a Turborepo monorepo and want Cloudflare-backed remote caching set up from scratch. Deploy whatever is needed and prove the second build is a remote cache hit.",
+      "expected_output": "Agent chooses the R2-first fast path, deploys or configures a Worker, avoids optional D1/KV until base cache works, runs real turbo remote:w then remote:r, reports cache hit and cleanup."
+    },
+    {
+      "id": 2,
+      "prompt": "Our Turboflare worker is already deployed but CI still misses cache. Debug onboarding and tell me exactly what to set in GitHub Actions.",
+      "expected_output": "Agent verifies TURBO_API/TURBO_TOKEN/TURBO_TEAM, checks /v8/artifacts/status, runs a real write/read smoke, notes HTTP workers.dev fallback if HTTPS direct fails, and outputs CI env vars with secrets redacted."
+    },
+    {
+      "id": 3,
+      "prompt": "Set up advanced Turboflare auth for our team: revocable tokens and artifact metadata queries. Make sure it works remotely.",
+      "expected_output": "Agent first confirms base R2 remote cache works, then creates/binds D1 TOKEN_DB and ARTIFACT_INDEX, applies schemas, creates/revokes tokens, verifies index insert and cleanup, and reports source-of-truth boundaries."
+    }
+  ]
+}
