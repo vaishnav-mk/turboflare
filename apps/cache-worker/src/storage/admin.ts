@@ -4,13 +4,13 @@ import { deleteIndexedArtifacts } from "./artifact-index";
 import { teamKeyPrefix } from "./keys";
 import { listStoredArtifacts } from "./list";
 
-export interface TeamStats {
+interface TeamStats {
 	bytes: number;
 	objects: number;
 	team: string;
 }
 
-export interface PurgeResult {
+interface PurgeResult {
 	deleted: number;
 	team: string;
 }
@@ -23,7 +23,7 @@ export async function teamStats(env: Env, team: string): Promise<TeamStats> {
 	let objects = 0;
 
 	do {
-		const listed = await listStoredArtifacts(env, teamPrefix(team), cursor, PAGE_LIMIT);
+		const listed = await listStoredArtifacts(env, teamKeyPrefix(team), cursor, PAGE_LIMIT);
 		for (const object of listed.objects) {
 			bytes += object.size;
 			objects += 1;
@@ -40,7 +40,7 @@ export async function purgeTeam(env: Env, team: string, maxDelete = PAGE_LIMIT):
 	let deleted = 0;
 
 	do {
-		const listed = await listStoredArtifacts(env, teamPrefix(team), cursor, PAGE_LIMIT);
+		const listed = await listStoredArtifacts(env, teamKeyPrefix(team), cursor, PAGE_LIMIT);
 		const selected = listed.objects.map((object) => object.key).slice(0, maxDelete - deleted);
 
 		if (selected.length > 0) {
@@ -53,8 +53,4 @@ export async function purgeTeam(env: Env, team: string, maxDelete = PAGE_LIMIT):
 	} while (cursor !== undefined);
 
 	return { deleted, team };
-}
-
-function teamPrefix(team: string): string {
-	return teamKeyPrefix(team);
 }

@@ -5,7 +5,7 @@ import { parseAuthScopes, parseAuthScopesJson, parseTeamKeys, parseTeamKeysJson 
 import { AuthScope } from "../auth/types";
 import { base64UrlBytes } from "../shared/base64";
 
-export interface TokenRecord {
+interface TokenRecord {
 	expiresAt: string | null;
 	id: string;
 	revokedAt: string | null;
@@ -13,16 +13,16 @@ export interface TokenRecord {
 	teams: readonly string[];
 }
 
-export interface CreatedToken extends TokenRecord {
+interface CreatedToken extends TokenRecord {
 	token: string;
 }
 
-export interface RevokedToken {
+interface RevokedToken {
 	id: string;
 	revokedAt: string;
 }
 
-export interface CreateTokenInput {
+interface CreateTokenInput {
 	expiresAt?: unknown;
 	id?: unknown;
 	scopes?: unknown;
@@ -73,7 +73,7 @@ export async function createToken(env: Env, input: CreateTokenInput): Promise<To
 	return { token: { expiresAt: parsed.expiresAt, id: parsed.id, revokedAt: null, scopes: parsed.scopes, teams: parsed.teams, token: parsed.token } };
 }
 
-export type RevokeResult = { error: "not_found" } | { revoked: RevokedToken };
+type RevokeResult = { error: "not_found" } | { revoked: RevokedToken };
 
 export async function revokeToken(env: Env, tokenId: string, now = new Date()): Promise<RevokeResult | null> {
 	if (env.TOKEN_DB === undefined) {
@@ -96,8 +96,8 @@ async function auditTokenAction(env: Env, tokenId: string, action: "create" | "r
 function parseCreateToken(input: CreateTokenInput): Omit<CreatedToken, "revokedAt"> | string {
 	const id = input.id === undefined ? `tok_${crypto.randomUUID()}` : parseId(input.id);
 	const token = input.token === undefined ? generatedToken() : parseRawToken(input.token);
-	const teams = parseTeams(input.teams);
-	const scopes = parseScopes(input.scopes);
+	const teams = parseTeamKeys(input.teams);
+	const scopes = parseAuthScopes(input.scopes);
 	const expiresAt = parseExpiresAt(input.expiresAt);
 
 	if (id === null) {
@@ -139,14 +139,6 @@ function parseId(value: unknown): string | null {
 
 function parseRawToken(value: unknown): string | null {
 	return typeof value === "string" && value.length > 0 && value.length <= MAX_BEARER_TOKEN_LENGTH ? value : null;
-}
-
-function parseTeams(value: unknown): readonly string[] {
-	return parseTeamKeys(value);
-}
-
-function parseScopes(value: unknown): readonly AuthScope[] {
-	return parseAuthScopes(value);
 }
 
 function parseExpiresAt(value: unknown): string | null | false {

@@ -1,13 +1,13 @@
 import { appConfig, ArtifactStore, type Env } from "../app/env";
 import { kvObjectSize, kvObjectUploaded, listKvArtifacts } from "./kv";
 
-export interface ListedStoredArtifact {
+interface ListedStoredArtifact {
 	key: string;
 	size: number;
 	uploaded: Date;
 }
 
-export interface ListedStoredArtifacts {
+interface ListedStoredArtifacts {
 	cursor?: string;
 	objects: readonly ListedStoredArtifact[];
 	truncated: boolean;

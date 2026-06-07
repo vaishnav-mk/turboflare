@@ -4,7 +4,7 @@ import { parseDurationMs } from "../shared/duration";
 import type { TenantContext } from "../tenancy/types";
 import type { ArtifactMetadataObject } from "./metadata";
 
-export interface ArtifactIndexInput {
+interface ArtifactIndexInput {
 	artifactId: string;
 	authContext: AuthContext;
 	customMetadata: Record<string, string>;

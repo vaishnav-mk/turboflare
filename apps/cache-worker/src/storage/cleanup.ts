@@ -4,7 +4,7 @@ import { ARTIFACT_NAMESPACE_VERSION } from "./constants";
 import { deleteIndexedArtifacts } from "./artifact-index";
 import { listStoredArtifacts } from "./list";
 
-export interface CleanupResult {
+interface CleanupResult {
 	deleted: number;
 	scanned: number;
 }

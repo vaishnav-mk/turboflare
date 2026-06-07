@@ -9,7 +9,7 @@ interface KvArtifactMetadata extends Record<string, string> {
 	uploaded: string;
 }
 
-export interface KvListedArtifact {
+interface KvListedArtifact {
 	key: string;
 	metadata: KvArtifactMetadata;
 }
