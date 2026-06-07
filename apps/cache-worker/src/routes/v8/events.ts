@@ -7,11 +7,7 @@ import { MetricEvent } from "../../observability/types";
 import { readBoundedJson } from "../../shared/json";
 import { MAX_TURBO_JSON_BODY_BYTES } from "../../storage/constants";
 
-export async function handleEvents(
-  request: Request,
-  env: Env,
-  ctx: ExecutionContext,
-): Promise<Response> {
+export async function handleEvents(request: Request, env: Env): Promise<Response> {
   if (request.method === HttpMethod.Get) {
     return jsonResponse([]);
   }
@@ -39,7 +35,7 @@ export async function handleEvents(
     );
   }
 
-  recordMetric(env, ctx, { event: MetricEvent.Events, method: request.method, status: 200 });
+  recordMetric(env, { event: MetricEvent.Events, method: request.method, status: 200 });
   return jsonResponse({ accepted: true });
 }
 

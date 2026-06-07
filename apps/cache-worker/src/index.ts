@@ -21,9 +21,7 @@ export default {
     env: Env,
     ctx: ExecutionContext,
   ): Promise<void> {
-    const cleanup = cleanupExpiredArtifacts(env);
-    const guardedCleanup = cleanup.catch(logCleanupFailure);
-    ctx.waitUntil(guardedCleanup);
+    ctx.waitUntil(cleanupExpiredArtifacts(env).catch(logCleanupFailure));
   },
 } satisfies ExportedHandler<Env>;
 

@@ -1,5 +1,4 @@
 import type { Env } from "../app/env";
-import type { TenantContext } from "../tenancy/types";
 import { readBearerToken, timingSafeEqual } from "./bearer-token";
 import { ALL_TEAMS, MAX_BEARER_TOKEN_LENGTH } from "./constants";
 import { authenticateD1Token } from "./d1";
@@ -34,10 +33,6 @@ export async function authenticateBearer(request: Request, env: Env): Promise<Au
 
 export function hasScope(authContext: AuthContext, scope: AuthScope): boolean {
   return authContext.scopes.includes(scope);
-}
-
-export function canAccessTenant(authContext: AuthContext, tenant: TenantContext): boolean {
-  return canAccessTeam(authContext, tenant.key);
 }
 
 export function canAccessTeam(authContext: AuthContext, teamKey: string): boolean {

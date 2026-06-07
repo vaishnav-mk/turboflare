@@ -13,11 +13,7 @@ export async function readBoundedJson(request: Request, maxBytes: number): Promi
     return { tooLarge: true };
   }
 
-  try {
-    return { tooLarge: false, value: JSON.parse(body.text) as unknown };
-  } catch {
-    return { tooLarge: false };
-  }
+  return { tooLarge: false, value: JSON.parse(body.text) as unknown };
 }
 
 export function parseJsonArray(value: string): unknown[] {

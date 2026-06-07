@@ -7,7 +7,7 @@ import {
 } from "@turboflare/protocol";
 
 import type { Env } from "./env";
-import { authenticateBearer, canAccessTenant, hasScope } from "../auth/bearer";
+import { authenticateBearer, canAccessTeam, hasScope } from "../auth/bearer";
 import { AuthScope, type AuthContext } from "../auth/types";
 import { ErrorCode, errorResponse } from "../http/response";
 import { recordMetric } from "../observability/metrics";
@@ -118,12 +118,12 @@ async function handleTurboRoute(state: RequestState): Promise<Response> {
   return handleTenantRoute(tenantState);
 }
 
-function handlePreflight({ ctx, env, request }: RequestState): Response | null {
+function handlePreflight({ env, request }: RequestState): Response | null {
   if (request.method !== HttpMethod.Options) {
     return null;
   }
 
-  recordMetric(env, ctx, { event: MetricEvent.Preflight, method: request.method, status: 204 });
+  recordMetric(env, { event: MetricEvent.Preflight, method: request.method, status: 204 });
   return preflightResponse();
 }
 
@@ -153,7 +153,6 @@ async function authenticateTurbo(state: RequestState): Promise<AuthenticatedStat
 
 async function handleStatusRoute({
   authContext,
-  ctx,
   env,
   request,
 }: AuthenticatedState): Promise<Response> {
@@ -162,14 +161,14 @@ async function handleStatusRoute({
     return protocolResponse(rateLimitError);
   }
 
-  const response = handleStatus(request, env, ctx);
+  const response = handleStatus(request, env);
   return protocolResponse(response);
 }
 
 function authorizeTenant(state: AuthenticatedState): TenantState | Response {
   const { authContext, env, request } = state;
   const tenant = resolveTenant(request, env);
-  if (!canAccessTenant(authContext, tenant)) {
+  if (!canAccessTeam(authContext, tenant.key)) {
     const response = errorResponse(403, ErrorCode.Forbidden, "Token cannot access this team");
     return protocolResponse(response);
   }
@@ -181,7 +180,7 @@ async function handleTenantRoute(state: TenantState): Promise<Response> {
   const { authContext, ctx, env, request, tenant, url } = state;
 
   if (url.pathname === ARTIFACT_EVENTS_PATH) {
-    const response = await handleEvents(request, env, ctx);
+    const response = await handleEvents(request, env);
     return protocolResponse(response);
   }
 

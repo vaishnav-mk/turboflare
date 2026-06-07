@@ -19,12 +19,12 @@ interface PurgeResult {
 const PAGE_LIMIT = 1000;
 
 export async function teamStats(env: Env, team: string): Promise<TeamStats> {
+  const prefix = teamKeyPrefix(team);
   let cursor: string | undefined;
   let bytes = 0;
   let objects = 0;
 
   do {
-    const prefix = teamKeyPrefix(team);
     const listed = await listStoredArtifacts(env, prefix, cursor, PAGE_LIMIT);
     for (const object of listed.objects) {
       bytes += object.size;
@@ -42,12 +42,12 @@ export async function purgeTeam(
   team: string,
   maxDelete = Number.MAX_SAFE_INTEGER,
 ): Promise<PurgeResult> {
+  const prefix = teamKeyPrefix(team);
   let cursor: string | undefined;
   let deleted = 0;
   let truncated = false;
 
   do {
-    const prefix = teamKeyPrefix(team);
     const listed = await listStoredArtifacts(env, prefix, cursor, PAGE_LIMIT);
     const objectKeys = listed.objects.map((object) => object.key);
     const remainingDeleteBudget = maxDelete - deleted;

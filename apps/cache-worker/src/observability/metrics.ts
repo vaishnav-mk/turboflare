@@ -3,17 +3,17 @@ import type { MetricPoint } from "./types";
 
 const ARTIFACT_ID_SAMPLE_LENGTH = 16;
 
-export function recordMetric(env: Env, ctx: ExecutionContext, point: MetricPoint): void {
+export function recordMetric(env: Env, point: MetricPoint): void {
   if (env.ANALYTICS === undefined) {
     return;
   }
 
-  const write = writeMetric(env.ANALYTICS, point);
-  const guardedWrite = write.catch(() => undefined);
-  ctx.waitUntil(guardedWrite);
+  try {
+    writeMetric(env.ANALYTICS, point);
+  } catch {}
 }
 
-async function writeMetric(analytics: AnalyticsEngineDataset, point: MetricPoint): Promise<void> {
+function writeMetric(analytics: AnalyticsEngineDataset, point: MetricPoint): void {
   const artifact = artifactSample(point.artifactId);
   const now = Date.now();
   analytics.writeDataPoint({

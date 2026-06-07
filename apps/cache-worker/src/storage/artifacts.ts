@@ -1,9 +1,8 @@
 import { appConfig, ArtifactStore, type Env } from "../app/env";
 import { ErrorCode, errorResponse } from "../http/response";
-import { MAX_KV_VALUE_BYTES } from "./constants";
+import { MAX_KV_VALUE_BYTES, OCTET_STREAM } from "./constants";
 import { deleteKvArtifacts, getKvArtifact, headKvArtifact, putKvArtifact } from "./kv";
 import type { ArtifactBodyObject, ArtifactMetadataObject } from "./metadata";
-import { getR2Artifact, headR2Artifact, putR2Artifact } from "./r2";
 import { deleteCachedArtifacts } from "./cache-api";
 
 export function artifactStoreUnavailable(env: Env): Response | null {
@@ -47,7 +46,7 @@ export function getArtifactObject(
 ): Promise<ArtifactBodyObject | R2ObjectBody | null> {
   return appConfig(env).artifactStore === ArtifactStore.Kv
     ? getKvArtifact(env, key)
-    : getR2Artifact(env, key);
+    : env.ARTIFACTS.get(key);
 }
 
 export function headArtifactObject(
@@ -56,7 +55,7 @@ export function headArtifactObject(
 ): Promise<ArtifactMetadataObject | R2Object | null> {
   return appConfig(env).artifactStore === ArtifactStore.Kv
     ? headKvArtifact(env, key)
-    : headR2Artifact(env, key);
+    : env.ARTIFACTS.head(key);
 }
 
 export function putArtifactObject(
@@ -67,5 +66,8 @@ export function putArtifactObject(
 ): Promise<ArtifactMetadataObject | R2Object> {
   return appConfig(env).artifactStore === ArtifactStore.Kv
     ? putKvArtifact(env, key, body, customMetadata)
-    : putR2Artifact(env, key, body, customMetadata);
+    : env.ARTIFACTS.put(key, body, {
+        httpMetadata: { contentType: OCTET_STREAM },
+        customMetadata,
+      });
 }

@@ -42,7 +42,7 @@ export async function handleArtifact(
   }
 
   if (request.method === HttpMethod.Head) {
-    return headArtifact(env, ctx, tenant, artifactId);
+    return headArtifact(env, tenant, artifactId);
   }
 
   return methodNotAllowed([HttpMethod.Get, HttpMethod.Head, HttpMethod.Put, HttpMethod.Options]);
@@ -65,7 +65,7 @@ async function putArtifact(
   if (signatureError !== null) {
     return signatureError;
   }
-  recordSignatureMetric(request, env, ctx, tenant, artifactId, authContext, config.signaturePolicy);
+  recordSignatureMetric(request, env, tenant, artifactId, authContext, config.signaturePolicy);
 
   const rawContentLength = request.headers.get("Content-Length");
   const contentLength = contentLengthHeader(rawContentLength);
@@ -127,7 +127,7 @@ async function putArtifact(
       () => undefined,
     ),
   );
-  recordMetric(env, ctx, {
+  recordMetric(env, {
     artifactId,
     event: MetricEvent.Put,
     method: request.method,
@@ -161,7 +161,7 @@ async function getArtifact(
     if (cached !== undefined) {
       const cachedContentLength = cached.headers.get("Content-Length");
       const cachedBytes = numberHeader(cachedContentLength);
-      recordMetric(env, ctx, {
+      recordMetric(env, {
         artifactId,
         bytes: cachedBytes,
         event: MetricEvent.GetHit,
@@ -183,7 +183,7 @@ async function getArtifact(
     object = await getArtifactObject(env, fallbackKey);
   }
   if (object === null) {
-    recordMetric(env, ctx, {
+    recordMetric(env, {
       artifactId,
       event: MetricEvent.GetMiss,
       method: HttpMethod.Get,
@@ -206,7 +206,7 @@ async function getArtifact(
     ctx.waitUntil(cachePut);
   }
 
-  recordMetric(env, ctx, {
+  recordMetric(env, {
     artifactId,
     bytes: object.size,
     event: MetricEvent.GetHit,
@@ -219,7 +219,6 @@ async function getArtifact(
 
 async function headArtifact(
   env: Env,
-  ctx: ExecutionContext,
   tenant: TenantContext,
   artifactId: string,
 ): Promise<Response> {
@@ -242,7 +241,7 @@ async function headArtifact(
     object = await headArtifactObject(env, fallbackKey);
   }
   if (object === null) {
-    recordMetric(env, ctx, {
+    recordMetric(env, {
       artifactId,
       event: MetricEvent.HeadMiss,
       method: HttpMethod.Head,
@@ -252,7 +251,7 @@ async function headArtifact(
     return new Response(null, { status: 404 });
   }
 
-  recordMetric(env, ctx, {
+  recordMetric(env, {
     artifactId,
     bytes: object.size,
     event: MetricEvent.HeadHit,
@@ -318,14 +317,13 @@ function requireSignature(request: Request, policy: SignaturePolicy): Response |
 function recordSignatureMetric(
   request: Request,
   env: Env,
-  ctx: ExecutionContext,
   tenant: TenantContext,
   artifactId: string,
   authContext: AuthContext,
   policy: SignaturePolicy,
 ): void {
   if (policy === SignaturePolicy.Monitor && !hasSignature(request)) {
-    recordMetric(env, ctx, {
+    recordMetric(env, {
       artifactId,
       event: MetricEvent.SignatureMissing,
       method: request.method,

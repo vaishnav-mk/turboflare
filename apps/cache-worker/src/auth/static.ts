@@ -9,10 +9,7 @@ export function parseAllowedTokens(rawTokens: string | undefined): readonly Stat
 
   return rawTokens
     .split(",")
-    .map((token) => {
-      const trimmed = token.trim();
-      return trimmed;
-    })
+    .map((token) => token.trim())
     .filter((token) => token.length > 0 && token.length <= MAX_BEARER_TOKEN_LENGTH)
     .map((token, index) => ({
       id: `static-${index}`,

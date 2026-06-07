@@ -1,6 +1,7 @@
 import { ARTIFACT_RESPONSE_HEADERS } from "@turboflare/protocol";
 
 const CACHE_ORIGIN = "https://turboflare-cache.invalid";
+const EXPOSED_ARTIFACT_HEADERS = ARTIFACT_RESPONSE_HEADERS.join(", ");
 
 export function artifactCache(): Cache {
   return (caches as unknown as { default: Cache }).default;
@@ -28,9 +29,8 @@ export function cacheableResponse(response: Response, key: string): Response {
   const headers = new Headers(response.headers);
   headers.set("Cache-Control", "public, max-age=31536000, immutable");
   const tag = cacheTag(key);
-  const exposedHeaders = ARTIFACT_RESPONSE_HEADERS.join(", ");
   headers.set("Cache-Tag", tag);
-  headers.set("Access-Control-Expose-Headers", exposedHeaders);
+  headers.set("Access-Control-Expose-Headers", EXPOSED_ARTIFACT_HEADERS);
   return new Response(response.body, {
     headers,
     status: response.status,

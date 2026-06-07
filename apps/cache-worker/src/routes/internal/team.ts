@@ -1,7 +1,7 @@
 import { HttpMethod } from "@turboflare/protocol";
 
 import type { Env } from "../../app/env";
-import { ErrorCode, errorResponse, jsonResponse, methodNotAllowed } from "../../http/response";
+import { jsonResponse, methodNotAllowed } from "../../http/response";
 import { purgeTeam, teamStats } from "../../storage/admin";
 
 enum InternalTeamAction {
@@ -30,14 +30,10 @@ export async function handleInternalTeam(request: Request, env: Env): Promise<Re
     return jsonResponse(stats);
   }
 
-  if (action === InternalTeamAction.PurgeAll) {
-    if (request.method !== HttpMethod.Post) {
-      return methodNotAllowed([HttpMethod.Post]);
-    }
-
-    const purge = await purgeTeam(env, team);
-    return jsonResponse(purge);
+  if (request.method !== HttpMethod.Post) {
+    return methodNotAllowed([HttpMethod.Post]);
   }
 
-  return errorResponse(404, ErrorCode.NotFound, "Not found");
+  const purge = await purgeTeam(env, team);
+  return jsonResponse(purge);
 }
