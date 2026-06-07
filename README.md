@@ -4,6 +4,12 @@
 
 Cloudflare-native remote cache for Turborepo. Fast Worker hot path. R2-backed artifacts. Self-hostable in minutes.
 
+Full docs live in `apps/docs`:
+
+```sh
+pnpm docs:dev
+```
+
 ## Why
 
 Turborepo remote cache should be boring infra:
@@ -196,6 +202,8 @@ Useful commands:
 | `pnpm test` | unit tests |
 | `pnpm test:integration` | real Turbo fixture against Worker handler |
 | `pnpm build` | Wrangler dry-run bundle |
+| `pnpm docs:dev` | run the docs app locally |
+| `pnpm docs:build` | build the docs app |
 | `pnpm r2:lifecycle:dry-run` | print lifecycle payload |
 | `pnpm prune:smoke web` | optional pruned workspace remote-cache smoke |
 

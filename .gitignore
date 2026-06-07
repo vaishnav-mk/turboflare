@@ -17,6 +17,7 @@
 /ci-results/
 /dist/
 **/dist/
+**/.vitepress/
 /build/
 **/build/
 /coverage/
