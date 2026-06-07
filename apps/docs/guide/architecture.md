@@ -6,16 +6,16 @@ Turboflare keeps the hot path intentionally small: authenticate, resolve tenant,
 
 ## Modules
 
-| Module | Responsibility |
-| --- | --- |
-| `app/router.ts` | route dispatch and shared `/v8` auth flow |
-| `auth/*` | static tokens, scoped tokens, D1 token auth, internal admin auth |
-| `tenancy/*` | team and branch resolution |
-| `routes/v8/*` | Turbo protocol endpoints |
-| `storage/*` | R2/KV storage, keys, metadata, cleanup, D1 index |
-| `observability/*` | Analytics Engine datapoints |
-| `rate-limit/*` | optional Rate Limiting binding enforcement |
-| `routes/internal/*` | admin stats, purge, token management, cleanup |
+| Module              | Responsibility                                                   |
+| ------------------- | ---------------------------------------------------------------- |
+| `app/router.ts`     | route dispatch and shared `/v8` auth flow                        |
+| `auth/*`            | static tokens, scoped tokens, D1 token auth, internal admin auth |
+| `tenancy/*`         | team and branch resolution                                       |
+| `routes/v8/*`       | Turbo protocol endpoints                                         |
+| `storage/*`         | R2/KV storage, keys, metadata, cleanup, D1 index                 |
+| `observability/*`   | Analytics Engine datapoints                                      |
+| `rate-limit/*`      | optional Rate Limiting binding enforcement                       |
+| `routes/internal/*` | admin stats, purge, token management, cleanup                    |
 
 ## Hot path
 
@@ -69,12 +69,12 @@ v1/team/{teamKey}/branch/{branch}/artifact/{artifactId}
 
 Design goals:
 
-| Goal | Why |
-| --- | --- |
-| versioned prefix | future migration path |
-| team prefix | cheap team stats/purge |
-| branch namespace | optional PR isolation |
-| encoded parts | safe R2 object keys |
+| Goal             | Why                    |
+| ---------------- | ---------------------- |
+| versioned prefix | future migration path  |
+| team prefix      | cheap team stats/purge |
+| branch namespace | optional PR isolation  |
+| encoded parts    | safe R2 object keys    |
 
 ## Source of truth
 
@@ -91,15 +91,15 @@ Analytics datapoint exists -> reporting only
 
 ## Optional Cloudflare products
 
-| Product | Binding | Why it is used |
-| --- | --- | --- |
-| R2 | `ARTIFACTS` | durable, streaming artifact storage; default source of truth |
-| KV | `ARTIFACTS_KV` | explicit small-artifact fallback for simple experiments |
-| D1 | `TOKEN_DB` | dynamic token auth: hashed tokens, teams, scopes, expiry, revocation, audit log |
-| D1 | `ARTIFACT_INDEX` | queryable artifact metadata for admin/search/reporting; not required for cache hits |
-| Cache API | none | optional edge acceleration for small repeated reads |
-| Analytics Engine | `ANALYTICS` | non-blocking metrics for hit/miss/status/upload/event traffic |
-| Rate Limiting | `RATE_LIMITER` | optional per-token or per-team request limiting |
+| Product          | Binding          | Why it is used                                                                      |
+| ---------------- | ---------------- | ----------------------------------------------------------------------------------- |
+| R2               | `ARTIFACTS`      | durable, streaming artifact storage; default source of truth                        |
+| KV               | `ARTIFACTS_KV`   | explicit small-artifact fallback for simple experiments                             |
+| D1               | `TOKEN_DB`       | dynamic token auth: hashed tokens, teams, scopes, expiry, revocation, audit log     |
+| D1               | `ARTIFACT_INDEX` | queryable artifact metadata for admin/search/reporting; not required for cache hits |
+| Cache API        | none             | optional edge acceleration for small repeated reads                                 |
+| Analytics Engine | `ANALYTICS`      | non-blocking metrics for hit/miss/status/upload/event traffic                       |
+| Rate Limiting    | `RATE_LIMITER`   | optional per-token or per-team request limiting                                     |
 
 Each optional binding can fail closed or be absent without changing the default Worker + R2 cache behavior. Artifact bodies live in R2/KV. Token state lives in D1 only when `TOKEN_DB` is enabled. Metrics live in Analytics Engine only when `ANALYTICS` is bound.
 

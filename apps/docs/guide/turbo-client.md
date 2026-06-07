@@ -13,10 +13,14 @@ export TURBO_TEAM="team-name"
 Run Turbo normally:
 
 ```sh
-turbo run build
+turbo run build --cache=local:,remote:w
+rm -rf .turbo
+turbo run build --cache=local:,remote:r
 ```
 
-Turbo handles cache lookup, upload, and restore. Turboflare only serves the remote cache protocol.
+Turbo handles cache lookup, upload, and restore. Turboflare only serves the remote cache protocol. The second run should report `cache hit`.
+
+If `https://<worker-name>.<subdomain>.workers.dev` fails only in Turbo with `Could not connect`, retry with `http://<worker-name>.<subdomain>.workers.dev`. This can happen on networks that intercept TLS with a certificate accepted by system TLS but rejected by Turbo's rustls client. For production HTTPS, prefer a custom domain or exclude the Worker host from TLS inspection.
 
 ## CI example
 
@@ -47,13 +51,13 @@ Turbo uploads task cache artifacts for task hashes. A cache hit requires the tas
 
 Common reasons a task does not hit:
 
-| Cause | Fix |
-| --- | --- |
-| different git state | compare commit and dirty files |
-| missing `TURBO_TEAM` | set a stable team name |
-| changed env inputs | inspect `turbo.json` inputs/env |
-| no task outputs | define cacheable outputs in `turbo.json` |
-| token cannot access team | check scoped token `teams` |
+| Cause                    | Fix                                      |
+| ------------------------ | ---------------------------------------- |
+| different git state      | compare commit and dirty files           |
+| missing `TURBO_TEAM`     | set a stable team name                   |
+| changed env inputs       | inspect `turbo.json` inputs/env          |
+| no task outputs          | define cacheable outputs in `turbo.json` |
+| token cannot access team | check scoped token `teams`               |
 
 ## Signed cache client config
 

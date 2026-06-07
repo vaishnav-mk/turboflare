@@ -15,22 +15,22 @@ DEFAULT_BRANCH=main
 
 Branch sources:
 
-| Source | Example |
-| --- | --- |
-| query param | `?branch=feature-x` |
-| header | `x-turboflare-branch: feature-x` |
-| team convention | `TURBO_TEAM=my-team@feature-x` |
+| Source          | Example                          |
+| --------------- | -------------------------------- |
+| query param     | `?branch=feature-x`              |
+| header          | `x-turboflare-branch: feature-x` |
+| team convention | `TURBO_TEAM=my-team@feature-x`   |
 
 Explicit query/header branch wins over `team@branch`.
 
 ## Policy behavior
 
-| Policy | Writes | Reads | Use when |
-| --- | --- | --- | --- |
-| `shared` | default team key | default team key | you want maximum reuse |
-| `isolated` | branch key | same branch key | branches must not share artifacts |
-| `main-write-pr-read` | branch key for PRs | branch key, then main fallback | PRs can reuse main but keep own writes |
-| `read-only-pr` | default branch only | PRs read main | untrusted PRs should not write |
+| Policy               | Writes              | Reads                          | Use when                               |
+| -------------------- | ------------------- | ------------------------------ | -------------------------------------- |
+| `shared`             | default team key    | default team key               | you want maximum reuse                 |
+| `isolated`           | branch key          | same branch key                | branches must not share artifacts      |
+| `main-write-pr-read` | branch key for PRs  | branch key, then main fallback | PRs can reuse main but keep own writes |
+| `read-only-pr`       | default branch only | PRs read main                  | untrusted PRs should not write         |
 
 ## Branch retention
 
@@ -70,11 +70,11 @@ export TURBO_REMOTE_CACHE_SIGNATURE_KEY="..."
 
 ## Signature policy modes
 
-| Mode | Behavior |
-| --- | --- |
-| `off` | no signature checks |
-| `accept` | preserve signed metadata when present |
-| `monitor` | emit metric when upload is unsigned |
+| Mode      | Behavior                                |
+| --------- | --------------------------------------- |
+| `off`     | no signature checks                     |
+| `accept`  | preserve signed metadata when present   |
+| `monitor` | emit metric when upload is unsigned     |
 | `require` | reject uploads missing `x-artifact-tag` |
 
 `require` checks for the Turbo signature tag. Turbo clients still verify signed artifacts when restoring them.

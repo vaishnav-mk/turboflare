@@ -9,7 +9,9 @@ export TURBO_API="https://turboflare-cache-worker.example.workers.dev"
 export TURBO_TOKEN="tf_..."
 export TURBO_TEAM="acme"
 
-turbo run build
+turbo run build --cache=local:,remote:w
+rm -rf .turbo
+turbo run build --cache=local:,remote:r
 ```
 
 ## GitHub Actions

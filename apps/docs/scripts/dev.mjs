@@ -10,50 +10,54 @@ const port = Number.parseInt(process.env.PORT ?? "4173", 10);
 await runBuild();
 
 createServer((request, response) => {
-	const url = new URL(request.url ?? "/", `http://localhost:${port}`);
-	const path = routePath(url.pathname);
-	const file = existsSync(path) ? path : join(dist, "404.html");
-	response.setHeader("Content-Type", contentType(file));
-	createReadStream(file).pipe(response);
+  const url = new URL(request.url ?? "/", `http://localhost:${port}`);
+  const path = routePath(url.pathname);
+  const file = existsSync(path) ? path : join(dist, "404.html");
+  response.setHeader("Content-Type", contentType(file));
+  createReadStream(file).pipe(response);
 }).listen(port, () => {
-	console.log(`docs: http://localhost:${port}`);
+  console.log(`docs: http://localhost:${port}`);
 });
 
 function routePath(pathname) {
-	const decoded = decodeURIComponent(pathname);
-	let target;
-	if (decoded === "/") {
-		target = join(dist, "index.html");
-	} else if (decoded.endsWith("/")) {
-		target = join(dist, decoded, "index.html");
-	} else {
-		const direct = join(dist, decoded);
-		target = extname(decoded) === "" ? join(direct, "index.html") : direct;
-	}
+  const decoded = decodeURIComponent(pathname);
+  let target;
+  if (decoded === "/") {
+    target = join(dist, "index.html");
+  } else if (decoded.endsWith("/")) {
+    target = join(dist, decoded, "index.html");
+  } else {
+    const direct = join(dist, decoded);
+    target = extname(decoded) === "" ? join(direct, "index.html") : direct;
+  }
 
-	const resolved = resolve(target);
-	if (!resolved.startsWith(resolve(dist))) {
-		return join(dist, "404.html");
-	}
-	return resolved;
+  const resolved = resolve(target);
+  if (!resolved.startsWith(resolve(dist))) {
+    return join(dist, "404.html");
+  }
+  return resolved;
 }
 
 function contentType(file) {
-	switch (extname(file)) {
-		case ".css":
-			return "text/css; charset=utf-8";
-		case ".svg":
-			return "image/svg+xml";
-		case ".js":
-			return "text/javascript; charset=utf-8";
-		default:
-			return "text/html; charset=utf-8";
-	}
+  switch (extname(file)) {
+    case ".css":
+      return "text/css; charset=utf-8";
+    case ".svg":
+      return "image/svg+xml";
+    case ".js":
+      return "text/javascript; charset=utf-8";
+    default:
+      return "text/html; charset=utf-8";
+  }
 }
 
 function runBuild() {
-	return new Promise((resolve, reject) => {
-		const child = spawn(process.execPath, [join(root, "scripts", "build.mjs")], { stdio: "inherit" });
-		child.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`build failed with ${code}`))));
-	});
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [join(root, "scripts", "build.mjs")], {
+      stdio: "inherit",
+    });
+    child.on("exit", (code) =>
+      code === 0 ? resolve() : reject(new Error(`build failed with ${code}`)),
+    );
+  });
 }

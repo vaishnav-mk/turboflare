@@ -4,30 +4,30 @@ This page covers production knobs, admin routes, observability, and troubleshoot
 
 ## Production checklist
 
-| Area | Recommendation |
-| --- | --- |
-| artifact store | use R2 default |
-| token | set `TURBO_TOKEN`, scoped tokens, or D1 tokens |
-| internal admin | set `INTERNAL_ADMIN_TOKEN` only if using `/internal/*` |
-| retention | apply R2 lifecycle |
-| signatures | use `SIGNATURE_POLICY=require` for stricter CI |
-| branch policy | keep `shared` unless PR isolation is needed |
-| observability | keep Worker observability enabled |
-| rate limits | bind `RATE_LIMITER` for hosted/multi-tenant deployments |
+| Area           | Recommendation                                          |
+| -------------- | ------------------------------------------------------- |
+| artifact store | use R2 default                                          |
+| token          | set `TURBO_TOKEN`, scoped tokens, or D1 tokens          |
+| internal admin | set `INTERNAL_ADMIN_TOKEN` only if using `/internal/*`  |
+| retention      | apply R2 lifecycle                                      |
+| signatures     | use `SIGNATURE_POLICY=require` for stricter CI          |
+| branch policy  | keep `shared` unless PR isolation is needed             |
+| observability  | keep Worker observability enabled                       |
+| rate limits    | bind `RATE_LIMITER` for hosted/multi-tenant deployments |
 
 ## Internal routes
 
 All `/internal/*` routes require `INTERNAL_ADMIN_TOKEN`.
 
-| Route | Method | Purpose |
-| --- | --- | --- |
-| `/internal/health` | `GET` | internal health check |
-| `/internal/teams/:team/stats` | `GET` | object count and total bytes |
-| `/internal/teams/:team/purge-all` | `POST` | delete artifacts for one team |
-| `/internal/artifacts/purge-expired` | `POST` | run cleanup immediately |
-| `/internal/tokens` | `GET` | list D1 tokens |
-| `/internal/tokens` | `POST` | create D1 token |
-| `/internal/tokens/:id/revoke` | `POST` | revoke D1 token |
+| Route                               | Method | Purpose                       |
+| ----------------------------------- | ------ | ----------------------------- |
+| `/internal/health`                  | `GET`  | internal health check         |
+| `/internal/teams/:team/stats`       | `GET`  | object count and total bytes  |
+| `/internal/teams/:team/purge-all`   | `POST` | delete artifacts for one team |
+| `/internal/artifacts/purge-expired` | `POST` | run cleanup immediately       |
+| `/internal/tokens`                  | `GET`  | list D1 tokens                |
+| `/internal/tokens`                  | `POST` | create D1 token               |
+| `/internal/tokens/:id/revoke`       | `POST` | revoke D1 token               |
 
 ## Artifact index
 
@@ -51,11 +51,11 @@ Bind `ANALYTICS` to record non-blocking datapoints for status, preflight, upload
 
 Metric shape:
 
-| Field | Contents |
-| --- | --- |
-| index | tenant key |
-| blobs | event, method, tenant, artifact sample, token id |
-| doubles | status, bytes, timestamp |
+| Field   | Contents                                         |
+| ------- | ------------------------------------------------ |
+| index   | tenant key                                       |
+| blobs   | event, method, tenant, artifact sample, token id |
+| doubles | status, bytes, timestamp                         |
 
 Analytics Engine is append-only observability. It should not be used as the artifact inventory or token database.
 
@@ -101,15 +101,15 @@ pnpm prune:smoke web
 
 ## Troubleshooting
 
-| Symptom | Likely cause | Fix |
-| --- | --- | --- |
-| `401` on `/v8/artifacts/status` | missing/wrong bearer token | set `TURBO_TOKEN` on Worker and client |
-| `403` on upload | token lacks write scope or team access | check scoped token teams/scopes |
-| `403` on branch writes | `read-only-pr` policy | use default branch or change policy |
-| no remote hits | different task hash, missing `TURBO_TEAM`, changed outputs | verify Turbo env and task outputs |
-| KV upload rejected | missing `Content-Length` or artifact too large | use R2 or smaller artifacts |
-| internal route `503` | admin token or optional binding missing | configure `INTERNAL_ADMIN_TOKEN`, `TOKEN_DB`, or `ARTIFACT_INDEX` |
-| lifecycle script fails | API token/account/bucket mismatch | check `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `R2_BUCKET_NAME` |
+| Symptom                         | Likely cause                                               | Fix                                                                     |
+| ------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `401` on `/v8/artifacts/status` | missing/wrong bearer token                                 | set `TURBO_TOKEN` on Worker and client                                  |
+| `403` on upload                 | token lacks write scope or team access                     | check scoped token teams/scopes                                         |
+| `403` on branch writes          | `read-only-pr` policy                                      | use default branch or change policy                                     |
+| no remote hits                  | different task hash, missing `TURBO_TEAM`, changed outputs | verify Turbo env and task outputs                                       |
+| KV upload rejected              | missing `Content-Length` or artifact too large             | use R2 or smaller artifacts                                             |
+| internal route `503`            | admin token or optional binding missing                    | configure `INTERNAL_ADMIN_TOKEN`, `TOKEN_DB`, or `ARTIFACT_INDEX`       |
+| lifecycle script fails          | API token/account/bucket mismatch                          | check `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `R2_BUCKET_NAME` |
 
 ## Local development
 

@@ -14,11 +14,11 @@ pnpm deploy
 
 That script:
 
-| Step | What happens |
-| --- | --- |
-| 1 | reads `apps/cache-worker/wrangler.jsonc` |
-| 2 | creates the configured R2 bucket if missing |
-| 3 | deploys `apps/cache-worker` with Wrangler |
+| Step | What happens                                |
+| ---- | ------------------------------------------- |
+| 1    | reads `apps/cache-worker/wrangler.jsonc`    |
+| 2    | creates the configured R2 bucket if missing |
+| 3    | deploys `apps/cache-worker` with Wrangler   |
 
 After deployment, add a Worker secret named `TURBO_TOKEN` in the Cloudflare dashboard.
 
@@ -56,9 +56,9 @@ Default bucket config:
   "r2_buckets": [
     {
       "binding": "ARTIFACTS",
-      "bucket_name": "turboflare-artifacts"
-    }
-  ]
+      "bucket_name": "turboflare-artifacts",
+    },
+  ],
 }
 ```
 
@@ -95,10 +95,10 @@ curl -i https://<worker>/v8/artifacts/status
 
 Expected:
 
-| Request | Result |
-| --- | --- |
-| `/management/health` | `200` |
-| unauthenticated `/v8/artifacts/status` | `401` |
+| Request                                | Result |
+| -------------------------------------- | ------ |
+| `/management/health`                   | `200`  |
+| unauthenticated `/v8/artifacts/status` | `401`  |
 
 Authenticated status:
 

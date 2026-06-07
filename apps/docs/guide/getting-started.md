@@ -36,39 +36,43 @@ export TURBO_TEAM="team-name"
 Run Turbo normally:
 
 ```sh
-turbo run build
+turbo run build --cache=local:,remote:w
+rm -rf .turbo
+turbo run build --cache=local:,remote:r
 ```
 
 ## 4. Confirm it works
 
-Run the same task twice from a clean state. The first run uploads artifacts. A later matching task hash should restore from remote cache.
+Run the same task twice from a clean state. The first run uploads artifacts. The second command should show a remote `cache hit`.
+
+If Turbo says it cannot connect over HTTPS but `curl` can reach the Worker, your network may be intercepting TLS with a certificate that Turbo's rustls client rejects. Try `http://<worker-name>.<subdomain>.workers.dev`, disable TLS inspection for the Worker host, or use a custom HTTPS domain.
 
 You can also check basic endpoint behavior:
 
-| Request | Expected |
-| --- | --- |
-| `GET /management/health` | `200` |
-| unauthenticated `GET /v8/artifacts/status` | `401` |
-| authenticated `GET /v8/artifacts/status` | `{ "status": "enabled" }` |
+| Request                                    | Expected                  |
+| ------------------------------------------ | ------------------------- |
+| `GET /management/health`                   | `200`                     |
+| unauthenticated `GET /v8/artifacts/status` | `401`                     |
+| authenticated `GET /v8/artifacts/status`   | `{ "status": "enabled" }` |
 
 ## What gets cached?
 
 Turboflare stores Turbo task cache artifacts for task hashes. It does not store deployments and it does not warm future commits automatically.
 
-| Thing | Example |
-| --- | --- |
-| artifact id | Turbo task hash |
-| metadata | duration, tag, SHA, dirty hash |
-| body | compressed task outputs from Turbo |
-| storage key | `v1/team/{team}/artifact/{hash}` |
+| Thing       | Example                            |
+| ----------- | ---------------------------------- |
+| artifact id | Turbo task hash                    |
+| metadata    | duration, tag, SHA, dirty hash     |
+| body        | compressed task outputs from Turbo |
+| storage key | `v1/team/{team}/artifact/{hash}`   |
 
 ## Recommended production baseline
 
-| Area | Recommended setting |
-| --- | --- |
-| storage | R2 default |
-| auth | `TURBO_TOKEN` or scoped static tokens |
-| retention | R2 lifecycle enabled |
-| admin | separate `INTERNAL_ADMIN_TOKEN` if using `/internal/*` |
-| branch policy | keep `shared` unless you need PR isolation |
-| signatures | use `SIGNATURE_POLICY=require` for stricter CI |
+| Area          | Recommended setting                                    |
+| ------------- | ------------------------------------------------------ |
+| storage       | R2 default                                             |
+| auth          | `TURBO_TOKEN` or scoped static tokens                  |
+| retention     | R2 lifecycle enabled                                   |
+| admin         | separate `INTERNAL_ADMIN_TOKEN` if using `/internal/*` |
+| branch policy | keep `shared` unless you need PR isolation             |
+| signatures    | use `SIGNATURE_POLICY=require` for stricter CI         |
