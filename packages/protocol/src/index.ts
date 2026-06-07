@@ -1,5 +1,4 @@
-export const TURBO_API_VERSION = "v8";
-export const TURBO_API_PREFIX = `/${TURBO_API_VERSION}`;
+export const TURBO_API_PREFIX = "/v8";
 export const ARTIFACTS_PATH = `${TURBO_API_PREFIX}/artifacts`;
 export const ARTIFACT_STATUS_PATH = `${ARTIFACTS_PATH}/status`;
 export const ARTIFACT_EVENTS_PATH = `${ARTIFACTS_PATH}/events`;
@@ -76,14 +75,6 @@ export enum CacheEventType {
 export enum CacheEventSource {
 	Local = "LOCAL",
 	Remote = "REMOTE",
-}
-
-export interface CacheEvent {
-	duration: number;
-	event: CacheEventType;
-	hash: string;
-	sessionId?: string;
-	source: CacheEventSource;
 }
 
 const CACHE_STATUSES = new Set<string>(Object.values(CacheStatus));
