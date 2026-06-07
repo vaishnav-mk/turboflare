@@ -1,62 +1,86 @@
+import { HttpMethod } from "@turboflare/protocol";
+
 import type { Env } from "../../app/env";
-import { errorResponse, jsonResponse, methodNotAllowed } from "../../http/response";
+import { ErrorCode, errorResponse, jsonResponse, methodNotAllowed } from "../../http/response";
+import { readBoundedJson } from "../../shared/json";
 import { createToken, listTokens, revokeToken } from "../../storage/tokens";
 
 const TOKEN_ROUTE = /^\/internal\/tokens(?:\/([^/]+)\/revoke)?$/;
 
 export async function handleInternalTokens(request: Request, env: Env): Promise<Response | null> {
-	const url = new URL(request.url);
-	const match = url.pathname.match(TOKEN_ROUTE);
-	if (match === null) {
-		return null;
-	}
+  const url = new URL(request.url);
+  const match = url.pathname.match(TOKEN_ROUTE);
+  if (match === null) {
+    return null;
+  }
 
-	const tokenId = match[1] === undefined ? null : decodeURIComponent(match[1]);
-	if (tokenId !== null) {
-		if (request.method !== "POST") {
-			return methodNotAllowed(["POST"]);
-		}
+  const tokenId = match[1] === undefined ? null : decodeURIComponent(match[1]);
+  if (tokenId !== null) {
+    if (request.method !== HttpMethod.Post) {
+      return methodNotAllowed([HttpMethod.Post]);
+    }
 
-		const result = await revokeToken(env, tokenId);
-		if (result === null) {
-			return tokenDbMissing();
-		}
-		if ("error" in result) {
-			return errorResponse(404, "not_found", "Token not found or already revoked");
-		}
-		return jsonResponse(result);
-	}
+    const result = await revokeToken(env, tokenId);
+    if (result === null) {
+      return tokenDbMissing();
+    }
+    if ("error" in result) {
+      return errorResponse(404, ErrorCode.NotFound, "Token not found or already revoked");
+    }
+    return jsonResponse(result);
+  }
 
-	if (request.method === "GET") {
-		const tokens = await listTokens(env);
-		return tokens === null ? tokenDbMissing() : jsonResponse({ tokens });
-	}
+  if (request.method === HttpMethod.Get) {
+    const tokens = await listTokens(env);
+    if (tokens === null) {
+      return tokenDbMissing();
+    }
 
-	if (request.method === "POST") {
-		const created = await createToken(env, await requestJson(request));
-		if (created === null) {
-			return tokenDbMissing();
-		}
+    return jsonResponse({ tokens });
+  }
 
-		if ("error" in created) {
-			return errorResponse(400, "bad_request", created.error);
-		}
+  if (request.method === HttpMethod.Post) {
+    const body = await requestJson(request);
+    if (body instanceof Response) {
+      return body;
+    }
 
-		return jsonResponse({ token: created.token }, { status: 201 });
-	}
+    const created = await createToken(env, body);
+    if (created === null) {
+      return tokenDbMissing();
+    }
 
-	return methodNotAllowed(["GET", "POST"]);
+    if ("error" in created) {
+      if (created.error === "already_exists") {
+        return errorResponse(
+          409,
+          ErrorCode.AlreadyExists,
+          "Token id or token value already exists",
+        );
+      }
+      return errorResponse(400, ErrorCode.BadRequest, created.error);
+    }
+
+    return jsonResponse({ token: created.token }, { status: 201 });
+  }
+
+  return methodNotAllowed([HttpMethod.Get, HttpMethod.Post]);
 }
 
-async function requestJson(request: Request): Promise<Record<string, unknown>> {
-	try {
-		const body = (await request.json()) as unknown;
-		return body !== null && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>) : {};
-	} catch {
-		return {};
-	}
+async function requestJson(request: Request): Promise<Record<string, unknown> | Response> {
+  try {
+    const body = await readBoundedJson(request, 16 * 1024);
+    if (body.tooLarge) {
+      return errorResponse(413, ErrorCode.PayloadTooLarge, "Token request body is too large");
+    }
+    return body.value !== null && typeof body.value === "object" && !Array.isArray(body.value)
+      ? (body.value as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
 }
 
 function tokenDbMissing(): Response {
-	return errorResponse(503, "unavailable", "Token database is not configured");
+  return errorResponse(503, ErrorCode.Unavailable, "Token database is not configured");
 }
