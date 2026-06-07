@@ -4,7 +4,7 @@ import {
   ARTIFACT_STATUS_PATH,
   RouteAction,
   RoutePath,
-} from "../../packages/protocol/dist/index.js";
+} from "../../packages/protocol/dist/paths.js";
 import { requiredEnv } from "../shared/env.mjs";
 
 const r2Api = requiredEnv("TURBOFLARE_R2_API");
