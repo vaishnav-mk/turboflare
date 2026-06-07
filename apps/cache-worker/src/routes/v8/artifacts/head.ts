@@ -3,9 +3,8 @@ import { HttpMethod } from "@turboflare/protocol";
 import type { Env } from "../../../app/env";
 import { recordMetric } from "../../../observability/metrics";
 import { MetricEvent } from "../../../observability/types";
-import { artifactStoreUnavailable } from "../../../storage/artifact/availability";
-import { headArtifactObject } from "../../../storage/artifact/head";
-import { artifactKey, fallbackArtifactKey } from "../../../storage/keys";
+import { artifactStoreUnavailable, headArtifactObject } from "../../../storage/artifact/store";
+import { artifactKeySet } from "../../../storage/keys";
 import { artifactResponseHeaders } from "../../../storage/metadata";
 import type { TenantContext } from "../../../tenancy/types";
 
@@ -14,13 +13,9 @@ export async function headArtifact(
   tenant: TenantContext,
   artifactId: string,
 ): Promise<Response> {
-  const key = artifactKey(tenant, artifactId);
-  if (key instanceof Response) {
-    return key;
-  }
-  const fallbackKey = fallbackArtifactKey(tenant, artifactId);
-  if (fallbackKey instanceof Response) {
-    return fallbackKey;
+  const keys = artifactKeySet(tenant, artifactId);
+  if (keys instanceof Response) {
+    return keys;
   }
 
   const storeError = artifactStoreUnavailable(env);
@@ -28,9 +23,9 @@ export async function headArtifact(
     return storeError;
   }
 
-  let object = await headArtifactObject(env, key);
-  if (object === null && fallbackKey !== null) {
-    object = await headArtifactObject(env, fallbackKey);
+  let object = await headArtifactObject(env, keys.key);
+  if (object === null && keys.fallbackKey !== null) {
+    object = await headArtifactObject(env, keys.fallbackKey);
   }
   if (object === null) {
     recordMetric(env, {

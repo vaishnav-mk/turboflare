@@ -3,6 +3,28 @@ import { utf8ByteLength } from "../shared/bytes";
 import type { TenantContext } from "../tenancy/types";
 import { ARTIFACT_NAMESPACE_VERSION, MAX_R2_KEY_BYTES } from "./constants";
 
+export interface ArtifactKeySet {
+  fallbackKey: string | null;
+  key: string;
+}
+
+export function artifactKeySet(
+  tenant: TenantContext,
+  artifactId: string,
+): ArtifactKeySet | Response {
+  const key = artifactKey(tenant, artifactId);
+  if (key instanceof Response) {
+    return key;
+  }
+
+  const fallbackKey = fallbackArtifactKey(tenant, artifactId);
+  if (fallbackKey instanceof Response) {
+    return fallbackKey;
+  }
+
+  return { fallbackKey, key };
+}
+
 export function artifactKey(tenant: TenantContext, artifactId: string): string | Response {
   const key = artifactKeyForBranch(tenant, artifactId, tenant.branch);
   if (utf8ByteLength(key) > MAX_R2_KEY_BYTES) {

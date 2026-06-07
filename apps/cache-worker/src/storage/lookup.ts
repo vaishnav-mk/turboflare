@@ -4,9 +4,9 @@ import type { Env } from "../app/env";
 import { ErrorCode, errorResponse, jsonResponse } from "../http/response";
 import { mapWithConcurrency } from "../shared/concurrency";
 import type { TenantContext } from "../tenancy/types";
-import { headArtifactObject } from "./artifact/head";
+import { headArtifactObject } from "./artifact/store";
 import { BATCH_HEAD_CONCURRENCY, MAX_BATCH_HASHES } from "./constants";
-import { artifactKey, fallbackArtifactKey } from "./keys";
+import { artifactKeySet } from "./keys";
 import { lookupHit } from "./metadata";
 
 export async function lookupArtifacts(
@@ -26,18 +26,14 @@ export async function lookupArtifacts(
     artifactIds,
     BATCH_HEAD_CONCURRENCY,
     async (artifactId) => {
-      const key = artifactKey(tenant, artifactId);
-      if (key instanceof Response) {
-        return [artifactId, null] as const;
-      }
-      const fallbackKey = fallbackArtifactKey(tenant, artifactId);
-      if (fallbackKey instanceof Response) {
+      const keys = artifactKeySet(tenant, artifactId);
+      if (keys instanceof Response) {
         return [artifactId, null] as const;
       }
 
-      let object = await headArtifactObject(env, key);
-      if (object === null && fallbackKey !== null) {
-        object = await headArtifactObject(env, fallbackKey);
+      let object = await headArtifactObject(env, keys.key);
+      if (object === null && keys.fallbackKey !== null) {
+        object = await headArtifactObject(env, keys.fallbackKey);
       }
       return [artifactId, object === null ? null : lookupHit(object)] as const;
     },

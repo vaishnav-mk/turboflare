@@ -19,6 +19,8 @@ export const ARTIFACT_RESPONSE_HEADERS = [
   ArtifactHeader.DirtyHash,
 ] as const;
 
+export const ARTIFACT_EXPOSE_HEADERS = ARTIFACT_RESPONSE_HEADERS.join(", ");
+
 export const PREFLIGHT_ALLOW_HEADERS = [
   "Authorization",
   "Content-Type",

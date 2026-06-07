@@ -63,12 +63,27 @@ const DEFAULT_CACHE_API_MAX_BYTES = 10 * 1024 * 1024;
 const DEFAULT_CLEANUP_MAX_DELETE = 1000;
 const DEFAULT_MAX_ARTIFACT_BYTES = 500 * 1024 * 1024;
 const DEFAULT_RETENTION_DAYS = 30;
+const CONFIG_FIELDS = [
+  "ARTIFACT_STORE",
+  "BRANCH_CACHE_POLICY",
+  "BRANCH_RETENTION_DAYS",
+  "CACHE_API_MAX_BYTES",
+  "CACHE_API_READS",
+  "CACHE_STATUS",
+  "CLEANUP_MAX_DELETE",
+  "DEFAULT_BRANCH",
+  "INTERNAL_ADMIN_TOKEN",
+  "MAX_ARTIFACT_BYTES",
+  "READ_ONLY",
+  "RETENTION_DAYS",
+  "SIGNATURE_POLICY",
+] as const;
 
 let cachedConfig: AppConfig | undefined;
 let cachedConfigKey: string | undefined;
 
 export function appConfig(env: Env): AppConfig {
-  const key = `${env.ARTIFACT_STORE}|${env.BRANCH_CACHE_POLICY}|${env.BRANCH_RETENTION_DAYS}|${env.CACHE_API_MAX_BYTES}|${env.CACHE_API_READS}|${env.CACHE_STATUS}|${env.CLEANUP_MAX_DELETE}|${env.DEFAULT_BRANCH}|${env.INTERNAL_ADMIN_TOKEN}|${env.MAX_ARTIFACT_BYTES}|${env.READ_ONLY}|${env.RETENTION_DAYS}|${env.SIGNATURE_POLICY}`;
+  const key = configKey(env);
   if (cachedConfig !== undefined && cachedConfigKey === key) {
     return cachedConfig;
   }
@@ -95,6 +110,10 @@ export function appConfig(env: Env): AppConfig {
   };
   cachedConfigKey = key;
   return cachedConfig;
+}
+
+function configKey(env: Env): string {
+  return JSON.stringify(CONFIG_FIELDS.map((field) => env[field] ?? null));
 }
 
 function branchCachePolicy(value: string | undefined): BranchCachePolicy {

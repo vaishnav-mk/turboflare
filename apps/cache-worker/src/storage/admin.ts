@@ -1,5 +1,5 @@
 import type { Env } from "../app/env";
-import { deleteStoredArtifacts } from "./artifact/delete";
+import { deleteStoredArtifacts } from "./artifact/store";
 import { deleteIndexedArtifacts } from "./artifact/index";
 import { teamKeyPrefix } from "./keys";
 import { listStoredArtifacts } from "./list";

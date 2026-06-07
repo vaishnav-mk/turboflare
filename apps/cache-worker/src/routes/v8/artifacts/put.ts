@@ -6,10 +6,12 @@ import { ErrorCode, errorResponse, jsonResponse } from "../../../http/response";
 import { recordMetric } from "../../../observability/metrics";
 import { MetricEvent } from "../../../observability/types";
 import { readBoundedBytes } from "../../../shared/json";
-import { artifactStoreUnavailable } from "../../../storage/artifact/availability";
 import { indexArtifact } from "../../../storage/artifact/index";
-import { artifactUploadLimit } from "../../../storage/artifact/limits";
-import { putArtifactObject } from "../../../storage/artifact/put";
+import {
+  artifactStoreUnavailable,
+  artifactUploadLimit,
+  putArtifactObject,
+} from "../../../storage/artifact/store";
 import { deleteCachedArtifacts } from "../../../storage/cache-api";
 import { OCTET_STREAM } from "../../../storage/constants";
 import { artifactKey } from "../../../storage/keys";
