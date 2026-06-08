@@ -1,70 +1,102 @@
 # Feature Matrix
 
-Turboflare is alpha. This table lists implemented features only.
+Turboflare is alpha. These are implemented features only, checked against Turboflare's Worker code and Turborepo's remote-cache client behavior.
 
-This list was checked against Turboflare's Worker code and the local Turborepo checkout's remote-cache client/mock/types:
+## Turbo Client Compatibility
 
-- `/Users/vaishnav/Work/projects/turborepo/crates/turborepo-vercel-api/src/lib.rs`
-- `/Users/vaishnav/Work/projects/turborepo/crates/turborepo-vercel-api-mock/src/lib.rs`
-- `/Users/vaishnav/Work/projects/turborepo/packages/turbo-types/src/types/config-v2.ts`
+| Feature                  | Enabled by                                                         | Notes                                                                                                     |
+| ------------------------ | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| Custom cache API URL     | `TURBO_API` or Turbo `remoteCache.apiUrl`                          | Use the Worker origin only. Do not append protocol paths. See [Turbo Client Setup](/guide/turbo-client/). |
+| Remote cache enable flag | Turbo `remoteCache.enabled`                                        | If `false`, Turbo will not call Turboflare. See [Getting Started](/guide/getting-started/).               |
+| Preflight mode           | Turbo `remoteCache.preflight`                                      | Turboflare supports `OPTIONS /v8/*` with auth headers. See [API Reference](/reference/api/).              |
+| Signed cache mode        | Turbo `remoteCache.signature` + `TURBO_REMOTE_CACHE_SIGNATURE_KEY` | Turbo signs uploads and verifies downloads. Turboflare stores the tag and can require it.                 |
+| Team slug selector       | `TURBO_TEAM` / query `slug`                                        | Turbo sends team slug as `slug`. See [Auth & Teams](/guide/auth-teams/).                                  |
+| Team id selector         | `TURBO_TEAMID` / query `teamId`                                    | Turbo sends `teamId` when configured and it starts with `team_`.                                          |
+| Cache operation timeouts | Turbo `remoteCache.timeout`, `remoteCache.uploadTimeout`           | Client-side behavior; Turboflare just needs to answer within those limits.                                |
 
-| Area                       | Feature                      | How it is enabled                                                   | Notes                                                                                                                                               |
-| -------------------------- | ---------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Turbo client compatibility | Custom cache API URL         | `TURBO_API` or Turbo `remoteCache.apiUrl`                           | Turboflare expects the Worker origin only; do not append protocol paths. See [Turbo Client Setup](/guide/turbo-client/).                            |
-| Turbo client compatibility | Remote cache enable flag     | Turbo `remoteCache.enabled`                                         | If the client sets this to `false`, Turbo will not call Turboflare. See [Getting Started](/guide/getting-started/).                                 |
-| Turbo client compatibility | Preflight mode               | Turbo `remoteCache.preflight`                                       | Turboflare supports `OPTIONS /v8/*` with authorization headers. See [API Reference](/reference/api/).                                               |
-| Turbo client compatibility | Signed cache mode            | Turbo `remoteCache.signature` + `TURBO_REMOTE_CACHE_SIGNATURE_KEY`  | Turbo signs uploads and verifies downloads; Turboflare stores the tag and can require it. See [Branches & Signatures](/guide/branches-signatures/). |
-| Turbo client compatibility | Team slug selector           | `TURBO_TEAM` / query `slug`                                         | Turbo sends the team slug as `slug` for remote cache calls. See [Auth & Teams](/guide/auth-teams/).                                                 |
-| Turbo client compatibility | Team id selector             | `TURBO_TEAMID` / query `teamId`                                     | Turbo sends `teamId` when configured and it starts with `team_`. See [Auth & Teams](/guide/auth-teams/).                                            |
-| Turbo client compatibility | Cache operation timeouts     | Turbo `remoteCache.timeout`, `remoteCache.uploadTimeout`            | Client-side behavior; Turboflare just needs to answer within those limits.                                                                          |
-| Turbo protocol             | Artifact status              | default                                                             | `GET /v8/artifacts/status` returns cache status. See [API Reference](/reference/api/).                                                              |
-| Turbo protocol             | Artifact upload              | default                                                             | `PUT /v8/artifacts/:id`, write scope required. See [API Reference](/reference/api/).                                                                |
-| Turbo protocol             | Artifact download            | default                                                             | `GET /v8/artifacts/:id`, read scope required. See [API Reference](/reference/api/).                                                                 |
-| Turbo protocol             | Metadata-only lookup         | default                                                             | `HEAD /v8/artifacts/:id` returns metadata headers without body. See [API Reference](/reference/api/).                                               |
-| Turbo protocol             | Batch lookup                 | default                                                             | `POST /v8/artifacts` accepts `hashes`. See [API Reference](/reference/api/).                                                                        |
-| Turbo protocol             | Hit/miss events              | default                                                             | `POST /v8/artifacts/events`; `GET` returns empty history for compatibility. See [API Reference](/reference/api/).                                   |
-| Turbo protocol             | CORS/preflight               | default                                                             | `OPTIONS /v8/*` returns Turbo-compatible preflight headers. See [API Reference](/reference/api/).                                                   |
-| Compatibility              | Turbo identity routes        | default                                                             | `/v2/user`, `/v2/teams`, and `/v2/teams/:id`. See [API Reference](/reference/api/).                                                                 |
-| Storage                    | R2 artifact store            | default binding `ARTIFACTS`                                         | Source of truth for normal deployments. See [Storage & Retention](/guide/storage-retention/).                                                       |
-| Storage                    | KV artifact store            | `ARTIFACT_STORE=kv` + `ARTIFACTS_KV`                                | Small-artifact fallback; 25 MiB KV value cap. See [Storage & Retention](/guide/storage-retention/).                                                 |
-| Storage                    | Upload size cap              | `MAX_ARTIFACT_BYTES`                                                | Defaults to 500 MiB; no-length uploads are bounded. See [Configuration](/guide/configuration/).                                                     |
-| Storage                    | Versioned object keys        | default                                                             | Keys use `v1/team/...`; branch keys add `/branch/...`. See [Architecture](/guide/architecture/).                                                    |
-| Storage                    | R2 lifecycle helper          | `pnpm r2:lifecycle`                                                 | Applies bucket lifecycle rules through Cloudflare API. See [Storage & Retention](/guide/storage-retention/).                                        |
-| Cleanup                    | Scheduled cleanup            | cron in `wrangler.jsonc`                                            | Deletes expired stored artifacts up to `CLEANUP_MAX_DELETE`. See [Operations](/guide/operations/).                                                  |
-| Cleanup                    | Manual expired purge         | `INTERNAL_ADMIN_TOKEN`                                              | `POST /internal/artifacts/purge-expired`. See [API Reference](/reference/api/).                                                                     |
-| Auth                       | Single static token          | `TURBO_TOKEN`                                                       | Smallest setup; bearer auth. See [Auth & Teams](/guide/auth-teams/).                                                                                |
-| Auth                       | Static token allowlist       | `TURBO_TOKEN` comma list                                            | Multiple accepted bearer tokens. See [Auth & Teams](/guide/auth-teams/).                                                                            |
-| Auth                       | Scoped static tokens         | `TURBO_TOKEN_SCOPES`                                                | JSON rules for token id, teams, and read/write scopes. See [Auth & Teams](/guide/auth-teams/).                                                      |
-| Auth                       | D1 token database            | `TOKEN_DB` binding                                                  | Hashed tokens, expiration, revocation, team/scope rules, audit rows. See [Auth & Teams](/guide/auth-teams/).                                        |
-| Auth                       | Internal admin token         | `INTERNAL_ADMIN_TOKEN`                                              | Required for `/internal/*`; missing config fails closed. See [Operations](/guide/operations/).                                                      |
-| Tenancy                    | Team selectors               | default                                                             | Uses `slug`, `teamId`, `team`, or fallback `global`. See [Auth & Teams](/guide/auth-teams/).                                                        |
-| Tenancy                    | Team access checks           | scoped tokens/D1 tokens                                             | Resolved team must be allowed by token. See [Auth & Teams](/guide/auth-teams/).                                                                     |
-| Branches                   | Shared branch policy         | default                                                             | Maximum reuse; no branch namespace. See [Branches & Signatures](/guide/branches-signatures/).                                                       |
-| Branches                   | Isolated branch policy       | `BRANCH_CACHE_POLICY=isolated`                                      | Separate branch namespaces. See [Branches & Signatures](/guide/branches-signatures/).                                                               |
-| Branches                   | Main fallback policy         | `BRANCH_CACHE_POLICY=main-write-pr-read`                            | Branch reads can fall back to main. See [Branches & Signatures](/guide/branches-signatures/).                                                       |
-| Branches                   | Read-only PR policy          | `BRANCH_CACHE_POLICY=read-only-pr`                                  | Non-default branch writes are rejected. See [Branches & Signatures](/guide/branches-signatures/).                                                   |
-| Branches                   | Branch selectors             | branch policy enabled                                               | Supports `?branch=`, `x-turboflare-branch`, and `team@branch`. See [Branches & Signatures](/guide/branches-signatures/).                            |
-| Integrity                  | Signature metadata preserve  | `SIGNATURE_POLICY=accept`                                           | Stores Turbo signature tag when present. See [Branches & Signatures](/guide/branches-signatures/).                                                  |
-| Integrity                  | Signature monitoring         | `SIGNATURE_POLICY=monitor` + `ANALYTICS`                            | Emits metric when upload lacks signature tag. See [Branches & Signatures](/guide/branches-signatures/).                                             |
-| Integrity                  | Require signature tag        | `SIGNATURE_POLICY=require`                                          | Rejects uploads missing `x-artifact-tag`. See [Branches & Signatures](/guide/branches-signatures/).                                                 |
-| Safety                     | Read-only mode               | `READ_ONLY=true`                                                    | Rejects uploads while reads/status/events still work. See [Operations](/guide/operations/).                                                         |
-| Performance                | Cache API read fill          | `CACHE_API_READS=true`                                              | Optional read acceleration for artifacts up to `CACHE_API_MAX_BYTES`. See [Architecture](/guide/architecture/).                                     |
-| Observability              | Analytics Engine writes      | `ANALYTICS` binding                                                 | Non-blocking datapoints for traffic, hits, misses, uploads, and events. See [Operations](/guide/operations/).                                       |
-| Observability              | Metrics summary API          | `ANALYTICS_API_TOKEN`, `ANALYTICS_DATASET`, `CLOUDFLARE_ACCOUNT_ID` | `GET /internal/metrics/summary` supports `15m`, `1h`, `6h`, `24h`. See [API Reference](/reference/api/).                                            |
-| Protection                 | Rate limiting                | `RATE_LIMITER` binding                                              | Per-token or per-team/token guardrail. See [Operations](/guide/operations/).                                                                        |
-| Admin                      | Internal health              | `INTERNAL_ADMIN_TOKEN`                                              | `GET /internal/health`. See [API Reference](/reference/api/).                                                                                       |
-| Admin                      | Team stats                   | `INTERNAL_ADMIN_TOKEN`                                              | `GET /internal/teams/:team/stats`. See [API Reference](/reference/api/).                                                                            |
-| Admin                      | Team purge                   | `INTERNAL_ADMIN_TOKEN`                                              | `POST /internal/teams/:team/purge-all`. See [API Reference](/reference/api/).                                                                       |
-| Admin                      | Token admin APIs             | `INTERNAL_ADMIN_TOKEN` + `TOKEN_DB`                                 | List, create, and revoke D1 tokens. See [API Reference](/reference/api/).                                                                           |
-| Admin                      | Artifact metadata index      | `ARTIFACT_INDEX` binding                                            | D1 rows for admin/search/reporting; not source of truth. See [Operations](/guide/operations/).                                                      |
-| Deployment                 | Clone-free installer         | `pnpm dlx create-turboflare`                                        | Guided deploy, secret setup, smoke checks, optional Turbo verification. See [Getting Started](/guide/getting-started/).                             |
-| Deployment                 | Source-checkout setup        | `pnpm setup`                                                        | Guided setup for contributors/custom deployments. See [Getting Started](/guide/getting-started/).                                                   |
-| Deployment                 | Root deploy helper           | `pnpm deploy`                                                       | Creates configured R2 bucket if missing, then deploys Worker. See [Deploy](/guide/deploy/).                                                         |
-| Deployment                 | Deploy Button support        | root `wrangler.jsonc`                                               | Cloudflare Deploy Button can install/deploy from repo root. See [Deploy](/guide/deploy/).                                                           |
-| Testing                    | Unit tests                   | `pnpm test`                                                         | Worker route/auth/storage behavior.                                                                                                                 |
-| Testing                    | Real Turbo integration tests | `pnpm test:integration`                                             | Stock Turbo fixture verifies remote cache restore.                                                                                                  |
-| Testing                    | Pruned workspace smoke       | `pnpm prune:smoke`                                                  | Remote cache behavior inside pruned fixture workspace. See [Operations](/guide/operations/).                                                        |
-| Documentation              | Agentic setup guide          | docs page + setup skill                                             | Safe prompt/checklist for coding agents. See [Agentic Setup](/guide/agentic-setup/).                                                                |
+## Turbo Protocol
+
+| Feature               | Enabled by | Notes                                                                       |
+| --------------------- | ---------- | --------------------------------------------------------------------------- |
+| Artifact status       | default    | `GET /v8/artifacts/status` returns cache status.                            |
+| Artifact upload       | default    | `PUT /v8/artifacts/:id`, write scope required.                              |
+| Artifact download     | default    | `GET /v8/artifacts/:id`, read scope required.                               |
+| Metadata-only lookup  | default    | `HEAD /v8/artifacts/:id` returns metadata headers without body.             |
+| Batch lookup          | default    | `POST /v8/artifacts` accepts `hashes`.                                      |
+| Hit/miss events       | default    | `POST /v8/artifacts/events`; `GET` returns empty history for compatibility. |
+| CORS/preflight        | default    | `OPTIONS /v8/*` returns Turbo-compatible preflight headers.                 |
+| Turbo identity routes | default    | `/v2/user`, `/v2/teams`, and `/v2/teams/:id`.                               |
+
+See [API Reference](/reference/api/) for exact route shapes.
+
+## Storage And Retention
+
+| Feature               | Enabled by                           | Notes                                                                          |
+| --------------------- | ------------------------------------ | ------------------------------------------------------------------------------ |
+| R2 artifact store     | `ARTIFACTS` binding                  | Default source of truth. See [Storage & Retention](/guide/storage-retention/). |
+| KV artifact store     | `ARTIFACT_STORE=kv` + `ARTIFACTS_KV` | Small-artifact fallback; 25 MiB KV value cap.                                  |
+| Upload size cap       | `MAX_ARTIFACT_BYTES`                 | Defaults to 500 MiB; no-length uploads are bounded.                            |
+| Versioned object keys | default                              | Keys use `v1/team/...`; branch keys add `/branch/...`.                         |
+| R2 lifecycle helper   | `pnpm r2:lifecycle`                  | Applies bucket lifecycle rules through Cloudflare API.                         |
+| Scheduled cleanup     | cron in `wrangler.jsonc`             | Deletes expired stored artifacts up to `CLEANUP_MAX_DELETE`.                   |
+| Manual expired purge  | `INTERNAL_ADMIN_TOKEN`               | `POST /internal/artifacts/purge-expired`.                                      |
+
+## Auth And Tenancy
+
+| Feature                | Enabled by               | Notes                                                                |
+| ---------------------- | ------------------------ | -------------------------------------------------------------------- |
+| Single static token    | `TURBO_TOKEN`            | Smallest setup; bearer auth. See [Auth & Teams](/guide/auth-teams/). |
+| Static token allowlist | `TURBO_TOKEN` comma list | Multiple accepted bearer tokens.                                     |
+| Scoped static tokens   | `TURBO_TOKEN_SCOPES`     | JSON rules for token id, teams, and read/write scopes.               |
+| D1 token database      | `TOKEN_DB` binding       | Hashed tokens, expiration, revocation, team/scope rules, audit rows. |
+| Internal admin token   | `INTERNAL_ADMIN_TOKEN`   | Required for `/internal/*`; missing config fails closed.             |
+| Team selectors         | default                  | Uses `slug`, `teamId`, `team`, or fallback `global`.                 |
+| Team access checks     | scoped tokens/D1 tokens  | Resolved team must be allowed by token.                              |
+
+## Branches And Signatures
+
+| Feature                     | Enabled by                               | Notes                                                          |
+| --------------------------- | ---------------------------------------- | -------------------------------------------------------------- |
+| Shared branch policy        | default                                  | Maximum reuse; no branch namespace.                            |
+| Isolated branch policy      | `BRANCH_CACHE_POLICY=isolated`           | Separate branch namespaces.                                    |
+| Main fallback policy        | `BRANCH_CACHE_POLICY=main-write-pr-read` | Branch reads can fall back to main.                            |
+| Read-only PR policy         | `BRANCH_CACHE_POLICY=read-only-pr`       | Non-default branch writes are rejected.                        |
+| Branch selectors            | branch policy enabled                    | Supports `?branch=`, `x-turboflare-branch`, and `team@branch`. |
+| Signature metadata preserve | `SIGNATURE_POLICY=accept`                | Stores Turbo signature tag when present.                       |
+| Signature monitoring        | `SIGNATURE_POLICY=monitor` + `ANALYTICS` | Emits metric when upload lacks signature tag.                  |
+| Require signature tag       | `SIGNATURE_POLICY=require`               | Rejects uploads missing `x-artifact-tag`.                      |
+
+See [Branches & Signatures](/guide/branches-signatures/).
+
+## Ops And Protection
+
+| Feature                 | Enabled by                          | Notes                                                                   |
+| ----------------------- | ----------------------------------- | ----------------------------------------------------------------------- |
+| Read-only mode          | `READ_ONLY=true`                    | Rejects uploads while reads/status/events still work.                   |
+| Cache API read fill     | `CACHE_API_READS=true`              | Optional read acceleration up to `CACHE_API_MAX_BYTES`.                 |
+| Analytics Engine writes | `ANALYTICS` binding                 | Non-blocking datapoints for traffic, hits, misses, uploads, and events. |
+| Metrics summary API     | analytics query vars                | `GET /internal/metrics/summary` supports `15m`, `1h`, `6h`, `24h`.      |
+| Rate limiting           | `RATE_LIMITER` binding              | Per-token or per-team/token guardrail.                                  |
+| Internal health         | `INTERNAL_ADMIN_TOKEN`              | `GET /internal/health`.                                                 |
+| Team stats              | `INTERNAL_ADMIN_TOKEN`              | `GET /internal/teams/:team/stats`.                                      |
+| Team purge              | `INTERNAL_ADMIN_TOKEN`              | `POST /internal/teams/:team/purge-all`.                                 |
+| Token admin APIs        | `INTERNAL_ADMIN_TOKEN` + `TOKEN_DB` | List, create, and revoke D1 tokens.                                     |
+| Artifact metadata index | `ARTIFACT_INDEX` binding            | D1 rows for admin/search/reporting; not source of truth.                |
+
+See [Operations](/guide/operations/).
+
+## Deployment And Testing
+
+| Feature                      | Enabled by                   | Notes                                                                                |
+| ---------------------------- | ---------------------------- | ------------------------------------------------------------------------------------ |
+| Clone-free installer         | `pnpm dlx create-turboflare` | Guided deploy, secret setup, smoke checks, optional Turbo verification.              |
+| Source-checkout setup        | `pnpm setup`                 | Guided setup for contributors/custom deployments.                                    |
+| Root deploy helper           | `pnpm deploy`                | Creates configured R2 bucket if missing, then deploys Worker.                        |
+| Deploy Button support        | root `wrangler.jsonc`        | Cloudflare Deploy Button can install/deploy from repo root.                          |
+| Unit tests                   | `pnpm test`                  | Worker route/auth/storage behavior.                                                  |
+| Real Turbo integration tests | `pnpm test:integration`      | Stock Turbo fixture verifies remote cache restore.                                   |
+| Pruned workspace smoke       | `pnpm prune:smoke`           | Remote cache behavior inside pruned fixture workspace.                               |
+| Agentic setup guide          | docs page + setup skill      | Safe prompt/checklist for coding agents. See [Agentic Setup](/guide/agentic-setup/). |
 
 ## Not Included
 
