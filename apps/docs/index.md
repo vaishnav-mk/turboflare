@@ -8,7 +8,18 @@ Turborepo remote cache should be boring infrastructure: deploy it, set a token, 
 | Durable artifact storage | R2 as source of truth                               |
 | Simple auth              | static tokens, scoped tokens, optional D1 tokens    |
 | Ops control              | R2 lifecycle, bounded cleanup, internal purge/stats |
-| Stock Turbo support      | `/v8/artifacts` plus `/v2` team discovery           |
+| Turbo support            | standard remote cache behavior, no client fork      |
+
+## If this sounds like your team
+
+| You have...                            | Turboflare helps by...                                     |
+| -------------------------------------- | ---------------------------------------------------------- |
+| PRs rebuilding the same packages       | restoring cached Turbo tasks from Cloudflare.              |
+| cache data that must stay in your org  | keeping artifacts in your R2 bucket with your own tokens.  |
+| open-source forks or untrusted PRs     | letting trusted branches write while PRs read safely.      |
+| teams split across regions             | serving repeated reads from nearby Cloudflare PoPs.        |
+| too much infra for a build cache       | replacing cache servers with one Worker and one R2 bucket. |
+| client projects that cannot share data | namespacing each repo, customer, or branch independently.  |
 
 ## Request flow
 

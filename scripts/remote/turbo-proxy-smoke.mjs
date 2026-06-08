@@ -11,7 +11,7 @@ import { removeGeneratedDirectories } from "../shared/turbo-fixture.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(SCRIPT_DIR, "..", "..");
-const FIXTURE_ROOT = join(REPO_ROOT, "fixtures", "complex-turbo-monorepo");
+const FIXTURE_ROOT = join(REPO_ROOT, "fixtures", "sample-monorepo");
 const TURBO_BIN = join(REPO_ROOT, "node_modules", ".bin", "turbo");
 const target = requiredEnv("TURBOFLARE_R2_API");
 const token = requiredEnv("TURBOFLARE_TOKEN");

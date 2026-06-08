@@ -8,10 +8,10 @@ Turboflare keeps the hot path intentionally small: authenticate, resolve tenant,
 
 | Module              | Responsibility                                                   |
 | ------------------- | ---------------------------------------------------------------- |
-| `app/router.ts`     | route dispatch and shared `/v8` auth flow                        |
+| `app/router.ts`     | route dispatch and shared Turbo auth flow                        |
 | `auth/*`            | static tokens, scoped tokens, D1 token auth, internal admin auth |
 | `tenancy/*`         | team and branch resolution                                       |
-| `routes/v8/*`       | Turbo protocol endpoints                                         |
+| `routes/*`          | Turbo cache protocol and internal admin endpoints                |
 | `storage/*`         | R2/KV storage, keys, metadata, cleanup, D1 index                 |
 | `observability/*`   | Analytics Engine datapoints                                      |
 | `rate-limit/*`      | optional Rate Limiting binding enforcement                       |
@@ -19,37 +19,9 @@ Turboflare keeps the hot path intentionally small: authenticate, resolve tenant,
 
 ## Hot path
 
-Artifact upload:
+![Turboflare hot path](/diagrams/hot-path.svg)
 
-```txt
-PUT /v8/artifacts/:artifactId
-  -> validate bearer token and write scope
-  -> resolve tenant/team/branch
-  -> enforce read-only and signature policy
-  -> validate size/content type
-  -> stream request.body into R2.put(), or buffer up to the size cap when Content-Length is absent
-  -> index metadata in background if ARTIFACT_INDEX is bound
-```
-
-Artifact download:
-
-```txt
-GET /v8/artifacts/:artifactId
-  -> validate bearer token and read scope
-  -> resolve tenant/team/branch
-  -> optionally check Cache API
-  -> stream R2.get().body to client
-  -> optionally fill Cache API in background
-```
-
-Artifact metadata:
-
-```txt
-HEAD /v8/artifacts/:artifactId
-  -> validate bearer token and read scope
-  -> R2.head()
-  -> return metadata headers without reading object body
-```
+Uploads validate auth, resolve tenancy, enforce policy, then stream directly into the artifact store. Downloads validate auth, resolve tenancy, optionally check edge cache, then stream the artifact body. Metadata reads avoid downloading the object body.
 
 KV mode uses the same routing and key model, but it is an explicit fallback. KV buffers uploads, caps values at 25 MiB, and cannot do metadata-only `HEAD` without reading the stored value. R2 is recommended for real cache artifacts.
 

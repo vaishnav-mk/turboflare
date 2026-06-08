@@ -1,0 +1,61 @@
+<svg width="980" height="560" viewBox="0 0 980 560" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Turboflare hot path flows">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#64748B"/></marker>
+  </defs>
+  <rect width="980" height="560" rx="24" fill="#0F172A"/>
+  <g font-family="Inter, ui-sans-serif, system-ui" font-size="15">
+    <text x="50" y="46" fill="#E2E8F0" font-size="22" font-weight="800">Hot path</text>
+    <text x="50" y="72" fill="#94A3B8" font-size="13">Small synchronous path. Optional work moves to cache fill, metrics, or metadata indexing.</text>
+
+    <rect x="42" y="104" width="896" height="122" rx="18" fill="#111827" stroke="#334155"/>
+    <text x="70" y="134" fill="#FFEDD5" font-weight="800">Upload</text>
+    <rect x="72" y="154" width="125" height="44" rx="12" fill="#1E293B" stroke="#F97316"/>
+    <text x="134" y="181" fill="#FED7AA" text-anchor="middle" font-weight="700">Turbo write</text>
+    <rect x="247" y="154" width="125" height="44" rx="12" fill="#1E293B" stroke="#38BDF8"/>
+    <text x="309" y="181" fill="#E0F2FE" text-anchor="middle" font-weight="700">Auth + scope</text>
+    <rect x="422" y="154" width="125" height="44" rx="12" fill="#1E293B" stroke="#A78BFA"/>
+    <text x="484" y="181" fill="#EDE9FE" text-anchor="middle" font-weight="700">Team key</text>
+    <rect x="597" y="154" width="125" height="44" rx="12" fill="#1E293B" stroke="#FBBF24"/>
+    <text x="659" y="181" fill="#FEF3C7" text-anchor="middle" font-weight="700">Policy checks</text>
+    <rect x="772" y="154" width="125" height="44" rx="12" fill="#1E293B" stroke="#22C55E"/>
+    <text x="834" y="181" fill="#DCFCE7" text-anchor="middle" font-weight="700">Stream to R2</text>
+    <path d="M198 176 H242" stroke="#64748B" stroke-width="2" marker-end="url(#arrow)"/>
+    <path d="M373 176 H417" stroke="#64748B" stroke-width="2" marker-end="url(#arrow)"/>
+    <path d="M548 176 H592" stroke="#64748B" stroke-width="2" marker-end="url(#arrow)"/>
+    <path d="M723 176 H767" stroke="#64748B" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="834" y="214" fill="#94A3B8" text-anchor="middle" font-size="12">metadata index can run later</text>
+
+    <rect x="42" y="256" width="896" height="122" rx="18" fill="#111827" stroke="#334155"/>
+    <text x="70" y="286" fill="#E0F2FE" font-weight="800">Download</text>
+    <rect x="72" y="306" width="125" height="44" rx="12" fill="#1E293B" stroke="#38BDF8"/>
+    <text x="134" y="333" fill="#E0F2FE" text-anchor="middle" font-weight="700">Turbo read</text>
+    <rect x="247" y="306" width="125" height="44" rx="12" fill="#1E293B" stroke="#38BDF8"/>
+    <text x="309" y="333" fill="#E0F2FE" text-anchor="middle" font-weight="700">Auth + scope</text>
+    <rect x="422" y="306" width="125" height="44" rx="12" fill="#1E293B" stroke="#A78BFA"/>
+    <text x="484" y="333" fill="#EDE9FE" text-anchor="middle" font-weight="700">Team key</text>
+    <rect x="597" y="306" width="125" height="44" rx="12" fill="#1E293B" stroke="#FBBF24"/>
+    <text x="659" y="333" fill="#FEF3C7" text-anchor="middle" font-weight="700">Cache check</text>
+    <rect x="772" y="306" width="125" height="44" rx="12" fill="#1E293B" stroke="#22C55E"/>
+    <text x="834" y="333" fill="#DCFCE7" text-anchor="middle" font-weight="700">Stream body</text>
+    <path d="M198 328 H242" stroke="#64748B" stroke-width="2" marker-end="url(#arrow)"/>
+    <path d="M373 328 H417" stroke="#64748B" stroke-width="2" marker-end="url(#arrow)"/>
+    <path d="M548 328 H592" stroke="#64748B" stroke-width="2" marker-end="url(#arrow)"/>
+    <path d="M723 328 H767" stroke="#64748B" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="659" y="366" fill="#94A3B8" text-anchor="middle" font-size="12">optional edge acceleration</text>
+    <text x="834" y="366" fill="#94A3B8" text-anchor="middle" font-size="12">R2 is source of truth</text>
+
+    <rect x="42" y="408" width="896" height="102" rx="18" fill="#111827" stroke="#334155"/>
+    <text x="70" y="438" fill="#DCFCE7" font-weight="800">Metadata</text>
+    <rect x="72" y="458" width="150" height="34" rx="10" fill="#1E293B" stroke="#38BDF8"/>
+    <text x="147" y="480" fill="#E0F2FE" text-anchor="middle" font-weight="700">metadata read</text>
+    <rect x="292" y="458" width="150" height="34" rx="10" fill="#1E293B" stroke="#38BDF8"/>
+    <text x="367" y="480" fill="#E0F2FE" text-anchor="middle" font-weight="700">Auth + scope</text>
+    <rect x="512" y="458" width="150" height="34" rx="10" fill="#1E293B" stroke="#22C55E"/>
+    <text x="587" y="480" fill="#DCFCE7" text-anchor="middle" font-weight="700">R2 metadata</text>
+    <rect x="732" y="458" width="150" height="34" rx="10" fill="#1E293B" stroke="#A78BFA"/>
+    <text x="807" y="480" fill="#EDE9FE" text-anchor="middle" font-weight="700">headers only</text>
+    <path d="M223 475 H287" stroke="#64748B" stroke-width="2" marker-end="url(#arrow)"/>
+    <path d="M443 475 H507" stroke="#64748B" stroke-width="2" marker-end="url(#arrow)"/>
+    <path d="M663 475 H727" stroke="#64748B" stroke-width="2" marker-end="url(#arrow)"/>
+  </g>
+</svg>

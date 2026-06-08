@@ -172,49 +172,49 @@ const FEATURES = [
   {
     icon: HardDrives,
     title: "R2 artifact storage",
-    body: "Stream uploads and downloads through the Worker edge. R2 is the durable store behind every cache hit.",
+    body: "Durable cache artifacts in your Cloudflare account.",
     link: "/guide/storage-retention/",
   },
   {
     icon: Lightning,
-    title: "Full Turbo protocol",
-    body: "/v8/artifacts PUT/GET/HEAD, /v2 team discovery, artifact events. Stock Turbo, zero custom config.",
+    title: "Works with Turbo",
+    body: "Use standard Turbo remote cache env vars. No client fork.",
     link: "/reference/api/",
   },
   {
     icon: Key,
     title: "Flexible auth",
-    body: "Static bearer token to start. Scoped tokens, D1-backed token DB, TURBO_TOKEN_SCOPES when you grow.",
+    body: "Start with one token. Add scopes and teams later.",
     link: "/guide/auth-teams/",
   },
   {
     icon: Globe,
     title: "Edge-fast reads",
-    body: "Optional Cache API in front of R2 for sub-ms repeated reads at the nearest Cloudflare PoP.",
+    body: "Serve repeated reads from nearby Cloudflare PoPs.",
     link: "/guide/architecture/",
   },
   {
     icon: TreeStructure,
     title: "Branch isolation",
-    body: "Namespace cache per branch. Policies: shared, isolated, main-write-pr-read, read-only-pr.",
+    body: "Share main cache safely without trusting every PR.",
     link: "/guide/branches-signatures/",
   },
   {
     icon: ShieldCheck,
     title: "Signature enforcement",
-    body: "Require x-artifact-tag on uploads. Modes: off, accept, monitor, require.",
+    body: "Require signed uploads when CI needs stricter integrity.",
     link: "/guide/branches-signatures/",
   },
   {
     icon: Wrench,
     title: "Ops built-in",
-    body: "R2 lifecycle, cleanup cron, /internal stats and purge, Analytics Engine, Rate Limiting.",
+    body: "Retention, cleanup, stats, purge, and metrics hooks.",
     link: "/guide/operations/",
   },
   {
     icon: RocketLaunch,
     title: "One-click deploy",
-    body: "Deploy button creates R2 bucket + Worker. Set TURBO_TOKEN secret. Done.",
+    body: "Deploy Worker + R2, set a token, point Turbo at it.",
     link: "/guide/deploy/",
   },
 ];
@@ -247,7 +247,7 @@ function Hero() {
         <div className="hero-right">
           {[
             ["Worker + R2", "default architecture"],
-            ["/v8 compatible", "stock Turbo protocol"],
+            ["Turbo-compatible", "standard remote cache"],
             ["0 servers", "no infra to manage"],
           ].map(([v, l]) => (
             <div className="hero-stat" key={v}>

@@ -1,44 +1,36 @@
 # Troubleshooting
 
-Start with the status endpoint:
+Start with the Worker health check:
 
 ```sh
-curl -i -H "Authorization: Bearer $TURBO_TOKEN" \
-  https://<worker>/v8/artifacts/status
-```
-
-Expected:
-
-```json
-{ "status": "enabled" }
+curl -i "$TURBO_API/management/health"
 ```
 
 ## Common issues
 
-| Symptom                         | Likely cause                       | Fix                                                               |
-| ------------------------------- | ---------------------------------- | ----------------------------------------------------------------- |
-| `401` on `/v8/artifacts/status` | missing/wrong bearer token         | set matching Worker secret and client env                         |
-| `403` on upload                 | token lacks write scope            | check scoped token `scopes`                                       |
-| `403` on team                   | token cannot access team           | check `TURBO_TEAM` and token `teams`                              |
-| `403` on PR write               | `read-only-pr` policy              | use main branch or change policy                                  |
-| `413` in KV mode                | artifact above KV limit            | use R2                                                            |
-| no cache hits                   | different task hash                | inspect Turbo inputs, env, git dirty state                        |
-| internal route `503`            | admin token or optional DB missing | configure `INTERNAL_ADMIN_TOKEN`, `TOKEN_DB`, or `ARTIFACT_INDEX` |
-| lifecycle fails                 | Cloudflare API settings            | check account id, API token, bucket name, jurisdiction            |
+| Symptom              | Likely cause                       | Fix                                                               |
+| -------------------- | ---------------------------------- | ----------------------------------------------------------------- |
+| Turbo auth fails     | missing/wrong bearer token         | set matching Worker secret and client env                         |
+| `403` on upload      | token lacks write scope            | check scoped token `scopes`                                       |
+| `403` on team        | token cannot access team           | check `TURBO_TEAM` and token `teams`                              |
+| `403` on PR write    | `read-only-pr` policy              | use main branch or change policy                                  |
+| `413` in KV mode     | artifact above KV limit            | use R2                                                            |
+| no cache hits        | different task hash                | inspect Turbo inputs, env, git dirty state                        |
+| internal route `503` | admin token or optional DB missing | configure `INTERNAL_ADMIN_TOKEN`, `TOKEN_DB`, or `ARTIFACT_INDEX` |
+| lifecycle fails      | Cloudflare API settings            | check account id, API token, bucket name, jurisdiction            |
 
 ## Verify live Worker auth
 
 Unauthenticated status should be rejected:
 
 ```sh
-curl -i https://<worker>/v8/artifacts/status
+TURBO_TOKEN=bad-token turbo run build --cache=local:,remote:r
 ```
 
 Authenticated status should work:
 
 ```sh
-curl -i -H "Authorization: Bearer $TURBO_TOKEN" \
-  https://<worker>/v8/artifacts/status
+turbo run build --cache=local:,remote:r
 ```
 
 ## Verify R2 binding

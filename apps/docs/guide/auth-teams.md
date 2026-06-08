@@ -85,17 +85,9 @@ Turboflare accepts common Turbo cache server selectors:
 
 Scoped tokens check the resolved team key.
 
-## Turbo `/v2` compatibility
+## Turbo team discovery
 
-Turbo can discover user/team metadata from Vercel-style endpoints.
-
-| Route           | Result                           |
-| --------------- | -------------------------------- |
-| `/v2/user`      | synthetic user based on token id |
-| `/v2/teams`     | teams allowed by the token       |
-| `/v2/teams/:id` | one allowed team                 |
-
-These routes use the same bearer auth as `/v8` and require read scope.
+Turbo can discover user and team metadata from compatibility endpoints. These routes use the same bearer auth and require read scope.
 
 ## Branch-aware teams
 

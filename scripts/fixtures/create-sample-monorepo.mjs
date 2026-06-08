@@ -4,8 +4,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
-const fixture = join(root, "fixtures", "complex-turbo-monorepo");
-const fixturePath = "fixtures/complex-turbo-monorepo";
+const fixture = join(root, "fixtures", "sample-monorepo");
+const fixturePath = "fixtures/sample-monorepo";
 
 rmSync(fixture, { force: true, recursive: true });
 mkdirSync(join(fixture, "apps"), { recursive: true });

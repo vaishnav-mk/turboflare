@@ -96,28 +96,24 @@ Only set this if you want `/internal/*` admin routes. These routes fail closed w
 
 ```sh
 curl -i https://<worker>/management/health
-curl -i https://<worker>/v8/artifacts/status
 ```
 
 Expected:
 
-| Request                                | Result |
-| -------------------------------------- | ------ |
-| `/management/health`                   | `200`  |
-| unauthenticated `/v8/artifacts/status` | `401`  |
+| Check           | Result |
+| --------------- | ------ |
+| health endpoint | `200`  |
 
 Authenticated status:
 
 ```sh
 curl -H "Authorization: Bearer $TURBO_TOKEN" \
-  https://<worker>/v8/artifacts/status
+  "$TURBO_API"
 ```
 
 Expected:
 
-```json
-{ "status": "enabled" }
-```
+The Worker should accept the matching Turbo token.
 
 ## Deploy docs separately
 

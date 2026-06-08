@@ -1,70 +1,107 @@
 # Agentic Setup
 
-Use this when a coding agent has shell access to your repo and you want it to deploy Turboflare safely.
+Use this when you want a coding agent to deploy Turboflare, wire your repo to it, and prove a real remote cache hit.
 
-Give the agent this prompt:
+## Paste This Prompt
 
 ```txt
-Set up Turboflare for this repo. Use the turboflare-setup skill if available.
-Start with the smallest setup: Worker + R2 + one TURBO_TOKEN.
-Use Wrangler, do not print secrets, and verify a real Turbo remote cache hit.
-Stop before optional D1, KV, Analytics, Rate Limiting, or custom domains unless I ask.
-Final report must include Worker URL, TURBO_API, TURBO_TEAM, remote write result, remote read result, and cache hit count.
+Set up Turboflare for this repo.
+
+Goal: deploy a Cloudflare Worker + R2 remote cache for Turbo, configure this repo, and prove a real remote cache hit.
+
+Rules:
+- Use the smallest setup first: Worker, R2, one TURBO_TOKEN.
+- Use pnpm dlx create-turboflare unless this repo is Turboflare itself.
+- Do not print secrets.
+- Do not commit .env.turboflare.
+- Do not add D1, KV, Analytics, Rate Limiting, custom domains, or branch policies unless I ask.
+- Stop and explain if Wrangler is not logged in or Cloudflare auth blocks deployment.
+
+Done means:
+- Worker URL is known.
+- TURBO_API, TURBO_TEAM, and TURBO_TOKEN location are documented.
+- Worker health check passes.
+- Turbo write run completes.
+- Turbo read run after local cache cleanup shows cache hit.
+- Final answer includes exact commands run, pass/fail result, and any cleanup performed.
 ```
 
-## Acceptance Criteria
+## What The Agent Should Discover
 
-| Check                          | Required result                 |
-| ------------------------------ | ------------------------------- |
-| Worker deployed                | URL recorded                    |
-| R2 binding                     | `ARTIFACTS` present             |
-| Turbo token                    | stored as secret, never printed |
-| unauthenticated status         | `401`                           |
-| authenticated status           | `200`                           |
-| first Turbo run                | writes remote cache             |
-| second Turbo run after cleanup | reports remote `cache hit`      |
+| Question               | Expected action                                               |
+| ---------------------- | ------------------------------------------------------------- |
+| Is this an app repo?   | run clone-free setup with `pnpm dlx create-turboflare`        |
+| Is this Turboflare?    | run source setup with `pnpm setup`                            |
+| Where is Turbo root?   | find `turbo.json` or `turbo.jsonc`, then run Turbo from there |
+| Which package manager? | use `packageManager` or lockfile                              |
+| Which tasks are safe?  | ask before running builds/tests                               |
+| Is remote cache off?   | report `remoteCache.enabled=false`; do not fake success       |
 
-## What The Agent Should Do
+## Fast Path
 
-1. Prefer clone-free setup for normal app repos:
+For a normal app repo:
 
 ```sh
 pnpm dlx create-turboflare
 ```
 
-2. Use source setup only inside a Turboflare checkout:
+For a Turboflare source checkout:
 
 ```sh
 pnpm setup
 ```
 
-3. Verify the Worker directly:
+The guided setup should create or reuse the R2 bucket, deploy the Worker, set the Worker secret, write `.env.turboflare`, run health checks, and optionally run a real Turbo write/read verification.
 
-```sh
-curl -i https://<worker>/management/health
-curl -i https://<worker>/v8/artifacts/status
-curl -i -H "Authorization: Bearer $TURBO_TOKEN" \
-  https://<worker>/v8/artifacts/status
-```
+## Manual Verification
 
-4. Verify a real Turbo remote cache hit from the Turbo root:
+If the agent needs to verify by hand, keep it simple:
 
 ```sh
 set -a
 . ./.env.turboflare
 set +a
 
+curl -i "$TURBO_API/management/health"
 turbo run build --cache=local:,remote:w
 rm -rf .turbo
 turbo run build --cache=local:,remote:r
 ```
 
-The second run must show `cache hit`.
+The second Turbo run must show `cache hit`.
+
+## Final Report Shape
+
+Ask the agent to finish with this exact shape:
+
+```txt
+Turboflare setup: pass|partial|failed
+Worker URL: https://...
+TURBO_API: https://...
+TURBO_TEAM: ...
+TURBO_TOKEN: stored in Worker secret + .env.turboflare|not written
+Health check: pass|failed
+Remote write: pass|failed
+Remote read: pass|failed
+Cache hit: yes|no
+Cleanup: ...
+Next action, if any: ...
+```
+
+## Recovery Loops
+
+| Symptom                   | Agent should do                                                   |
+| ------------------------- | ----------------------------------------------------------------- |
+| Wrangler not logged in    | run `wrangler login` or stop with instructions                    |
+| install command fails     | report package manager, command, and first useful error           |
+| deploy succeeds, auth bad | reset Worker secret and retry without printing token              |
+| Turbo misses              | compare task hash inputs, team name, dirty git state, and outputs |
+| no safe Turbo task exists | stop after Worker health check and report manual Turbo command    |
 
 ## Guardrails
 
-- Do not print token values.
-- Do not commit `.env.turboflare`.
-- Do not clone Turboflare into the app repo unless the user explicitly wants source changes.
-- Do not add optional D1, KV, Analytics, Rate Limiting, custom domains, or lifecycle automation until the base cache works.
-- If `remoteCache.enabled=false`, report that Turbo is configured not to use remote cache instead of treating the miss as a Turboflare failure.
+- Never print token values.
+- Never commit `.env.turboflare`.
+- Never delete user source files to force a clean cache run.
+- Prefer a throwaway `TURBO_TEAM` for smoke tests.
+- Keep optional production features out of the first pass.

@@ -145,4 +145,4 @@ Bind `ARTIFACTS_KV` when using it.
 | R2 lifecycle support             | Worker cleanup only                        |
 | recommended default              | small-artifact fallback                    |
 
-KV mode is useful for testing or very small artifacts, but it is not the recommended production store. The Worker keeps the same `/v8` protocol in both modes; only the artifact backend changes.
+KV mode is useful for testing or very small artifacts, but it is not the recommended production store. The Worker keeps the same Turbo behavior in both modes; only the artifact backend changes.

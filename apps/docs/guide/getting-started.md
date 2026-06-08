@@ -141,7 +141,7 @@ export TURBO_TOKEN="<same token>"
 export TURBO_TEAM="team-name"
 ```
 
-`TURBO_API` must not include a trailing slash or `/v8` suffix.
+`TURBO_API` must be the Worker origin only. Do not append protocol paths.
 
 ### 4. Prove a remote hit
 
@@ -155,11 +155,11 @@ Run the same task twice from a clean state. The first run uploads artifacts. The
 
 You can also check basic endpoint behavior:
 
-| Request                                    | Expected                  |
-| ------------------------------------------ | ------------------------- |
-| `GET /management/health`                   | `200`                     |
-| unauthenticated `GET /v8/artifacts/status` | `401`                     |
-| authenticated `GET /v8/artifacts/status`   | `{ "status": "enabled" }` |
+| Check                | Expected |
+| -------------------- | -------- |
+| health endpoint      | `200`    |
+| missing Turbo token  | rejected |
+| matching Turbo token | accepted |
 
 ## What gets cached?
 

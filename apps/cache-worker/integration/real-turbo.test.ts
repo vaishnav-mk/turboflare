@@ -35,7 +35,7 @@ interface TurboRunOptions {
 
 const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const REPO_ROOT = join(PACKAGE_ROOT, "..", "..");
-const COMPLEX_FIXTURE_ROOT = join(REPO_ROOT, "fixtures", "complex-turbo-monorepo");
+const SAMPLE_FIXTURE_ROOT = join(REPO_ROOT, "fixtures", "sample-monorepo");
 const TURBO_BIN = join(REPO_ROOT, "node_modules", ".bin", "turbo");
 const TURBO_TOKEN = "fixture-token";
 const TURBO_TEAM = "team_fixture";
@@ -57,7 +57,7 @@ afterEach(async () => {
 });
 
 describe("real turbo fixture", () => {
-  it("restores a complex monorepo from remote cache on the second run", async ({ expect }) => {
+  it("restores a sample monorepo from remote cache on the second run", async ({ expect }) => {
     const artifacts = new MemoryR2Bucket();
     const server = await startWorkerServer({
       ARTIFACTS: artifacts as unknown as R2Bucket,
@@ -145,7 +145,7 @@ describe("real turbo fixture", () => {
 
 async function createTurboFixture(): Promise<TurboFixture> {
   const directory = await mkdtemp(join(tmpdir(), "turboflare-turbo-"));
-  await cp(COMPLEX_FIXTURE_ROOT, directory, { recursive: true });
+  await cp(SAMPLE_FIXTURE_ROOT, directory, { recursive: true });
   await runProcess("pnpm", ["install", "--frozen-lockfile"], directory);
   await runProcess("git", ["init"], directory);
   await runProcess("git", ["add", "."], directory);
