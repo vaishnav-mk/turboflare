@@ -1,0 +1,31 @@
+{
+  "name": "turboflare-cache-worker",
+  "main": "apps/cache-worker/src/index.ts",
+  "compatibility_date": "2026-05-07",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+  },
+  "triggers": {
+    "crons": ["17 3 * * *"],
+  },
+  "vars": {
+    "ANALYTICS_DATASET": "turboflare_metrics",
+    "CACHE_STATUS": "enabled",
+    "CLEANUP_MAX_DELETE": "1000",
+    "CLOUDFLARE_ACCOUNT_ID": "c714a393dbfabeb858a7dea729b5e8f8",
+    "RETENTION_DAYS": "30",
+  },
+  "analytics_engine_datasets": [
+    {
+      "binding": "ANALYTICS",
+      "dataset": "turboflare_metrics",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ARTIFACTS",
+      "bucket_name": "turboflare-artifacts",
+    },
+  ],
+}
