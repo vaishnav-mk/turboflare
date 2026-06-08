@@ -28,8 +28,6 @@ turbo run build --cache=local:,remote:r
 
 Turbo handles cache lookup, upload, and restore. Turboflare only serves the remote cache protocol. The second run should report `cache hit`.
 
-If `https://<worker-name>.<subdomain>.workers.dev` fails only in Turbo with `Could not connect`, your network may be intercepting TLS with a certificate accepted by system TLS but rejected by Turbo's rustls client. Prefer a custom HTTPS domain or exclude the Worker host from TLS inspection. Use plaintext HTTP only for diagnosis with a throwaway token, then rotate it.
-
 ## CI example
 
 ```yaml

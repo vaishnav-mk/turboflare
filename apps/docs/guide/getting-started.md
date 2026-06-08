@@ -151,8 +151,6 @@ turbo run build --cache=local:,remote:r
 
 Run the same task twice from a clean state. The first run uploads artifacts. The second command should show a remote `cache hit`.
 
-If Turbo says it cannot connect over HTTPS but `curl` can reach the Worker, your network may be intercepting TLS with a certificate that Turbo's rustls client rejects. Prefer a custom HTTPS domain or exclude the Worker host from TLS inspection. Use plaintext HTTP only for diagnosis with a throwaway token, then rotate it.
-
 You can also check basic endpoint behavior:
 
 | Request                                    | Expected                  |

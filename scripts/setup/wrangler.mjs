@@ -304,9 +304,7 @@ function assertTurboCacheHit(result) {
   }
 
   if (/remote caching unavailable|could not connect/i.test(output)) {
-    throw new Error(
-      "Turbo ran, but remote caching was unavailable. Check network/TLS settings and retry.",
-    );
+    throw new Error("Turbo ran, but remote caching was unavailable. Retry the Turbo check later.");
   }
 
   throw new Error("Turbo ran, but the second run did not report a remote cache hit.");

@@ -88,7 +88,7 @@ rm -rf .turbo
 turbo run build --cache=local:,remote:r
 ```
 
-Use HTTPS for `TURBO_API`. If direct HTTPS to `workers.dev` fails only in Turbo with “Could not connect”, prefer a custom HTTPS domain or exclude the host from TLS inspection. Use HTTP only for diagnosis with a throwaway token, then rotate it.
+Use the deployed Worker URL for `TURBO_API`. If Turbo cannot connect, report the failed command and the Worker smoke-check status.
 
 7. Report the exact result:
 
@@ -126,7 +126,7 @@ Real Turbo client:
 - First run with `--cache=local:,remote:w` executes tasks and uploads artifacts.
 - Clear local cache/generated outputs.
 - Second run with `--cache=local:,remote:r` shows remote `cache hit`.
-- If direct HTTPS `TURBO_API` fails but HTTP works with a throwaway token, document that exactly; do not claim the Worker protocol is broken.
+- If `TURBO_API` fails, document the exact Turbo output and the smoke-check results; do not claim the Worker protocol is broken without evidence.
 
 Admin cleanup:
 
@@ -198,7 +198,7 @@ Use when the user wants read acceleration.
 Check these in order:
 
 - `TURBO_API` includes protocol and no `/v8` suffix.
-- Prefer a custom HTTPS domain or exclude the Worker host from TLS inspection if direct HTTPS fails.
+- `TURBO_API` includes protocol and no `/v8` suffix.
 - `TURBO_TOKEN` matches Worker secret.
 - `TURBO_TEAM`, `TURBO_TEAMID`, or `team` is set.
 - `GET $TURBO_API/v8/artifacts/status` works with bearer auth.
