@@ -214,13 +214,8 @@ a {
 }
 .nav-item.active {
   color: var(--t1) !important;
-  background: linear-gradient(
-    90deg,
-    rgba(246, 130, 31, 0.14),
-    rgba(255, 255, 255, 0.055)
-  ) !important;
-  border-color: rgba(246, 130, 31, 0.18);
-  box-shadow: inset 3px 0 0 var(--accent);
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: transparent;
   font-weight: 650;
 }
 .nav-caret {
@@ -314,20 +309,35 @@ a {
   height: 100%;
   padding: 0 16px;
 }
+@media (max-width: 1099px) {
+  .topbar {
+    min-height: 56px;
+    padding: 8px 14px;
+  }
+}
 .nav-toggle {
   display: none;
   align-items: center;
   gap: 6px;
-  margin-right: 8px;
-  padding: 5px 9px;
+  justify-content: center;
+  flex: 0 0 auto;
+  margin-right: 10px;
+  width: 34px;
+  min-height: 32px;
+  padding: 0;
   border: 1px solid var(--b);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--t1);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--t);
   font: inherit;
   font-size: 12px;
   font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
+}
+.nav-toggle span {
+  display: none;
 }
 @media (max-width: 1099px) {
   .nav-toggle {
@@ -337,7 +347,7 @@ a {
 .topbar-nav {
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 4px;
   min-width: 0;
 }
 .crumb-link {
@@ -359,17 +369,17 @@ a {
 .crumb-select {
   appearance: none;
   -webkit-appearance: none;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  padding: 2px 18px 2px 6px;
+  background-color: rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--b);
+  border-radius: 8px;
+  padding: 5px 24px 5px 8px;
   font-size: 12px;
   font-family: var(--font);
   color: var(--t2);
   cursor: pointer;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='%2352525b' stroke-width='1.2' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 5px center;
+  background-position: right 8px center;
   background-size: 8px 5px;
   outline: none;
   transition:
@@ -379,7 +389,7 @@ a {
 }
 .crumb-select:hover {
   color: var(--t1);
-  border-color: var(--b);
+  background-color: rgba(255, 255, 255, 0.075);
 }
 .crumb-select:focus {
   border-color: var(--accent);
@@ -390,8 +400,13 @@ a {
   color: var(--t);
 }
 .crumb-page {
-  color: var(--t);
-  font-weight: 500;
+  color: var(--t2);
+  font-weight: 400;
+}
+@media (max-width: 699px) {
+  .crumb-select {
+    max-width: min(34vw, 150px);
+  }
 }
 
 .content-col {

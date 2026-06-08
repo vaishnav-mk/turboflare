@@ -25,6 +25,12 @@ export const pages = [
     section: "Start",
   },
   {
+    source: "guide/features.md",
+    output: "guide/features/index.html",
+    title: "Feature Matrix",
+    section: "Start",
+  },
+  {
     source: "guide/architecture.md",
     output: "guide/architecture/index.html",
     title: "Architecture",

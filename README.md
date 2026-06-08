@@ -62,6 +62,7 @@ wrangler secret put TURBO_TOKEN --config apps/cache-worker/wrangler.jsonc
 
 - Docs: <https://turboflare.vaishnav.one/>
 - Getting started: <https://turboflare.vaishnav.one/guide/getting-started/>
+- Feature matrix: <https://turboflare.vaishnav.one/guide/features/>
 - Issues: <https://github.com/vaishnav-mk/turboflare/issues>
 
 ## Development

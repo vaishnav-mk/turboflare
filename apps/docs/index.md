@@ -36,6 +36,8 @@ Thanks to Vercel for making Turborepo and the remote cache protocol easy to use 
 | Ops control              | R2 lifecycle, bounded cleanup, internal purge/stats |
 | Turbo support            | standard remote cache behavior, no client fork      |
 
+See the [Feature Matrix](/guide/features/) for the complete implemented feature list.
+
 ## If this sounds like your team
 
 | You have...                            | Turboflare helps by...                                     |
