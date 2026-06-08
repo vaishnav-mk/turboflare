@@ -1,6 +1,11 @@
 import { randomBytes } from "node:crypto";
 import { access, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import {
+  isRemoteCacheDisabled,
+  turboCachePath,
+  turboCommand,
+  turboContext,
+} from "../../packages/create-turboflare/bin/turbo-context.mjs";
 import { requiredString, stripJsonComments } from "../shared/jsonc.mjs";
 import {
   fail,
@@ -19,7 +24,6 @@ import {
 const CONFIG_PATH = "apps/cache-worker/wrangler.jsonc";
 const DEFAULT_ENV_FILE = ".env.turboflare";
 const MIN_NODE_MAJOR = 20;
-const TURBO_CONFIG_FILES = ["turbo.json", "turbo.jsonc"];
 
 try {
   await main();
@@ -316,103 +320,6 @@ async function maybeVerifyTurboCache(workerUrl, team, token) {
       "Turbo cache check skipped",
     );
   }
-}
-
-async function turboContext() {
-  const root = await findTurboRoot(process.cwd());
-  if (root === null) {
-    return null;
-  }
-
-  const configPath = requiredString(await turboConfigPath(root), "Turbo config path");
-  const config = JSON.parse(stripJsonComments(await readFile(configPath, "utf8")));
-  return { config, configPath, root };
-}
-
-async function findTurboRoot(directory) {
-  const current = resolve(directory);
-  const parent = dirname(current);
-  const parentRoot = parent === current ? null : await findTurboRoot(parent);
-  if (parentRoot !== null) {
-    return parentRoot;
-  }
-
-  return (await turboConfigPath(current)) === null ? null : current;
-}
-
-async function turboConfigPath(directory) {
-  const matches = await Promise.all(
-    TURBO_CONFIG_FILES.map(async (file) => {
-      const path = join(directory, file);
-      return (await exists(path)) ? path : null;
-    }),
-  );
-  return matches.find((path) => path !== null) ?? null;
-}
-
-function isRemoteCacheDisabled(config) {
-  return config.remoteCache?.enabled === false || config.global?.remoteCache?.enabled === false;
-}
-
-async function turboCommand(root) {
-  const manager = await packageManager(root);
-  if (manager === "npm") {
-    return { args: ["exec", "turbo", "--"], command: "npm", installCommand: "npm install" };
-  }
-  if (manager === "yarn") {
-    return { args: ["exec", "turbo"], command: "yarn", installCommand: "yarn install" };
-  }
-  if (manager === "bun") {
-    return { args: ["x", "turbo"], command: "bun", installCommand: "bun install" };
-  }
-
-  return { args: ["exec", "turbo"], command: "pnpm", installCommand: "pnpm install" };
-}
-
-async function packageManager(root) {
-  const packageJson = await readJson(join(root, "package.json"));
-  const value = typeof packageJson.packageManager === "string" ? packageJson.packageManager : "";
-  if (value.startsWith("npm@")) {
-    return "npm";
-  }
-  if (value.startsWith("yarn@")) {
-    return "yarn";
-  }
-  if (value.startsWith("bun@")) {
-    return "bun";
-  }
-  if (value.startsWith("pnpm@")) {
-    return "pnpm";
-  }
-  if (
-    (await exists(join(root, "package-lock.json"))) ||
-    (await exists(join(root, "npm-shrinkwrap.json")))
-  ) {
-    return "npm";
-  }
-  if (await exists(join(root, "yarn.lock"))) {
-    return "yarn";
-  }
-  if ((await exists(join(root, "bun.lock"))) || (await exists(join(root, "bun.lockb")))) {
-    return "bun";
-  }
-
-  return "pnpm";
-}
-
-async function readJson(path) {
-  return readFile(path, "utf8")
-    .then((value) => JSON.parse(value))
-    .catch(() => ({}));
-}
-
-function turboCachePath(context) {
-  const cacheDir = context.config.global?.cacheDir ?? context.config.cacheDir;
-  if (typeof cacheDir === "string" && cacheDir.trim().length > 0) {
-    return resolve(context.root, cacheDir);
-  }
-
-  return join(context.root, ".turbo");
 }
 
 function assertTurboCacheHit(result) {
