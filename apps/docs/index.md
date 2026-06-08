@@ -2,11 +2,23 @@
 
 Turborepo remote cache should be boring infrastructure: deploy it, set a token, point CI at it, and move on.
 
-Turborepo hashes each task from its inputs, command, env, and outputs. A remote cache lets one machine upload the result for a task hash, then another machine restore that result instead of rebuilding it. This is most useful in CI, where fresh runners usually start with an empty local cache.
+![Turboflare request flow](/diagrams/request-flow.svg)
 
-The win can be large when task hashes match. In Turboflare's own CI run `27145453178`, the uncached comparison build step took `95s`; the cold Turbo seed/upload step took `94s`; the rebuild from remote cache took `2s`. That is the build step dropping from about a minute and a half to a couple seconds, because the second job restored cached outputs instead of recomputing them.
+Quick context:
 
-Thanks to Vercel for making Turborepo and its remote cache protocol straightforward to use and self-host. If Vercel Remote Cache fits your project, use it; it is the easiest path. Turboflare is for the cases where you specifically want the cache Worker and artifacts in your own Cloudflare account.
+- [Turborepo](https://turbo.build/repo) hashes each task from inputs, command, env, and outputs.
+- [Remote caching](https://turbo.build/repo/docs/core-concepts/remote-caching) lets one runner upload a task result and another runner restore it.
+- This matters most in CI because fresh runners usually start with no local cache.
+
+Measured in Turboflare's own CI run [27145453178](https://github.com/vaishnav-mk/turboflare/actions/runs/27145453178):
+
+| CI step                  |  Time | Meaning                       |
+| ------------------------ | ----: | ----------------------------- |
+| no remote cache          | `95s` | rebuild everything            |
+| cold Turbo seed + upload | `94s` | compute once, store artifacts |
+| remote-cache rebuild     |  `2s` | restore matching task hashes  |
+
+Thanks to Vercel for making Turborepo and the remote cache protocol easy to use and self-host. If [Vercel Remote Cache](https://turbo.build/repo/docs/core-concepts/remote-caching) fits your project, use it. Turboflare is for teams that specifically want the cache Worker and artifacts in their own Cloudflare account.
 
 | Need                     | Turboflare gives you                                |
 | ------------------------ | --------------------------------------------------- |
@@ -26,10 +38,6 @@ Thanks to Vercel for making Turborepo and its remote cache protocol straightforw
 | teams split across regions             | serving repeated reads from nearby Cloudflare PoPs.        |
 | too much infra for a build cache       | replacing cache servers with one Worker and one R2 bucket. |
 | client projects that cannot share data | namespacing each repo, customer, or branch independently.  |
-
-## Request flow
-
-![Turboflare request flow](/diagrams/request-flow.svg)
 
 ## Choose a setup path
 
