@@ -25,7 +25,7 @@ Use it if you are comfortable owning your deployment and reading the code when s
 Clone-free guided setup:
 
 ```sh
-pnpm dlx create-turboflare
+pnpm dlx "github:vaishnav-mk/turboflare#path:packages/create-turboflare"
 ```
 
 Manual setup: deploy with the button above or from a source checkout, then set a Worker secret named `TURBO_TOKEN`.

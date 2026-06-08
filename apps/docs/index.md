@@ -23,7 +23,7 @@ Turborepo remote cache should be boring infrastructure: deploy it, set a token, 
 | Agentic setup    | you want an AI coding agent to do it safely | [Getting Started](/guide/getting-started/#agentic-setup) |
 
 ```sh
-pnpm dlx create-turboflare
+pnpm dlx "github:vaishnav-mk/turboflare#path:packages/create-turboflare"
 ```
 
 ## The shortest manual version

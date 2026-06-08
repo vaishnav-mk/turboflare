@@ -16,7 +16,7 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
   console.log(`create-turboflare
 
 Usage:
-  pnpm dlx create-turboflare
+  pnpm dlx "github:vaishnav-mk/turboflare#path:packages/create-turboflare"
 
 Environment:
   TURBOFLARE_SOURCE  giget source. Defaults to ${DEFAULT_SOURCE}

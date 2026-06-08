@@ -16,7 +16,7 @@ There are three setup paths:
 Run the installer from your app repo. You do not need to clone Turboflare:
 
 ```sh
-pnpm dlx create-turboflare
+pnpm dlx "github:vaishnav-mk/turboflare#path:packages/create-turboflare"
 ```
 
 It downloads Turboflare to a temporary directory, asks for the few values that cannot be inferred, then deletes the temporary files after setup.
