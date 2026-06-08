@@ -207,26 +207,45 @@ async function smoke(workerUrl, token) {
     "Smoke checks",
   );
   const base = workerUrl.replace(/\/$/, "");
-  const [health, unauthenticated, authenticated] = await withStep("Running smoke checks", () =>
-    Promise.all([
-      fetch(`${base}/management/health`),
-      fetch(`${base}/v8/artifacts/status`),
-      fetch(`${base}/v8/artifacts/status`, { headers: { Authorization: `Bearer ${token}` } }),
-    ]),
+  const result = await withStep("Running smoke checks", () =>
+    retrySmoke(async () => {
+      const [health, unauthenticated, authenticated] = await Promise.all([
+        fetch(`${base}/management/health`),
+        fetch(`${base}/v8/artifacts/status`),
+        fetch(`${base}/v8/artifacts/status`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      return {
+        authenticated: authenticated.status,
+        health: health.status,
+        unauthenticated: unauthenticated.status,
+      };
+    }),
   );
 
   printNote(
     [
-      `GET /management/health -> ${health.status}`,
-      `GET /v8/artifacts/status without auth -> ${unauthenticated.status}`,
-      `GET /v8/artifacts/status with auth -> ${authenticated.status}`,
+      `GET /management/health -> ${result.health}`,
+      `GET /v8/artifacts/status without auth -> ${result.unauthenticated}`,
+      `GET /v8/artifacts/status with auth -> ${result.authenticated}`,
     ].join("\n"),
     "Smoke checks",
   );
+}
 
-  if (health.status !== 200 || unauthenticated.status !== 401 || authenticated.status !== 200) {
-    throw new Error("smoke checks failed");
+async function retrySmoke(check, attempt = 1) {
+  const result = await check();
+  if (result.health === 200 && result.unauthenticated === 401 && result.authenticated === 200) {
+    return result;
   }
+
+  if (attempt >= 12) {
+    throw new Error(
+      `smoke checks failed: health=${result.health}, unauthenticated=${result.unauthenticated}, authenticated=${result.authenticated}`,
+    );
+  }
+
+  await sleep(5000);
+  return retrySmoke(check, attempt + 1);
 }
 
 async function writeClientEnv(writeEnv, workerUrl, team, token) {
@@ -300,4 +319,8 @@ async function exists(path) {
   return access(path)
     .then(() => true)
     .catch(() => false);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
