@@ -9,7 +9,7 @@
     {
       "id": 2,
       "prompt": "Our Turboflare worker is already deployed but CI still misses cache. Debug onboarding and tell me exactly what to set in GitHub Actions.",
-      "expected_output": "Agent verifies TURBO_API/TURBO_TOKEN/TURBO_TEAM, checks /v8/artifacts/status, runs a real write/read smoke, notes HTTP workers.dev fallback if HTTPS direct fails, and outputs CI env vars with secrets redacted."
+      "expected_output": "Agent verifies TURBO_API/TURBO_TOKEN/TURBO_TEAM, checks /v8/artifacts/status, runs a real write/read smoke, reports exact Turbo output if remote caching is unavailable, and outputs CI env vars with secrets redacted."
     },
     {
       "id": 3,

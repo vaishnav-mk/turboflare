@@ -1,6 +1,6 @@
 {
   "name": "create-turboflare",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "clone-free Turboflare installer",
   "license": "MIT",
   "bin": {

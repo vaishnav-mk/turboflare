@@ -76,7 +76,7 @@ pnpm --filter @turboflare/cache-worker deploy
 
 5. Configure `TURBO_TOKEN` securely. Prefer `wrangler secret put TURBO_TOKEN`; do not print or commit token values.
 
-6. Run a real Turbo smoke from a real Turborepo workspace:
+6. Run a real Turbo smoke from a real Turborepo workspace. Use the package manager declared in `package.json#packageManager` or implied by the lockfile. Run from the Turbo root that owns `turbo.json` or `turbo.jsonc`, not from a random package subdirectory:
 
 ```sh
 export TURBO_API="https://<worker>.<subdomain>.workers.dev"
@@ -89,6 +89,7 @@ turbo run build --cache=local:,remote:r
 ```
 
 Use the deployed Worker URL for `TURBO_API`. If Turbo cannot connect, report the failed command and the Worker smoke-check status.
+If `remoteCache.enabled=false` in root config, do not treat a missed remote hit as a Turboflare failure; Turbo is configured not to use remote cache.
 
 7. Report the exact result:
 
@@ -193,11 +194,10 @@ Use when the user wants read acceleration.
 
 ## Common Failure Modes
 
-### Turbo says “Could not connect”
+### Turbo cannot connect
 
 Check these in order:
 
-- `TURBO_API` includes protocol and no `/v8` suffix.
 - `TURBO_API` includes protocol and no `/v8` suffix.
 - `TURBO_TOKEN` matches Worker secret.
 - `TURBO_TEAM`, `TURBO_TEAMID`, or `team` is set.

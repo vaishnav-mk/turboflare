@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { access, readFile, rm, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { requiredString, stripJsonComments } from "../shared/jsonc.mjs";
 import {
   fail,
@@ -18,6 +19,7 @@ import {
 const CONFIG_PATH = "apps/cache-worker/wrangler.jsonc";
 const DEFAULT_ENV_FILE = ".env.turboflare";
 const MIN_NODE_MAJOR = 20;
+const TURBO_CONFIG_FILES = ["turbo.json", "turbo.jsonc"];
 
 try {
   await main();
@@ -237,9 +239,18 @@ async function smoke(workerUrl, token) {
 }
 
 async function maybeVerifyTurboCache(workerUrl, team, token) {
-  if (!(await exists("package.json"))) {
+  const context = await turboContext();
+  if (context === null) {
     printNote(
-      "No package.json found in this directory, so setup skipped the optional local Turbo build/test check.",
+      "No turbo.json or turbo.jsonc found in this directory or its parents, so setup skipped the optional local Turbo cache check.",
+      "Turbo cache check skipped",
+    );
+    return;
+  }
+
+  if (isRemoteCacheDisabled(context.config)) {
+    printNote(
+      `${context.configPath} has remoteCache.enabled=false, so Turbo will not use remote cache for this check. Enable remote cache before verifying Turboflare with Turbo.`,
       "Turbo cache check skipped",
     );
     return;
@@ -248,7 +259,9 @@ async function maybeVerifyTurboCache(workerUrl, team, token) {
   printNote(
     [
       "This optional check runs Turbo in this repo twice.",
-      "First run writes to remote cache. Then setup removes .turbo to force a remote read. Second run should report cache hits.",
+      "First run writes to remote cache. Then setup removes the local Turbo cache to force a remote read. Second run should report cache hits.",
+      `Turbo root: ${context.root}`,
+      `Turbo config: ${context.configPath}`,
       "Only choose this if the selected tasks are safe to run now.",
     ].join("\n"),
     "Optional Turbo cache check",
@@ -259,23 +272,31 @@ async function maybeVerifyTurboCache(workerUrl, team, token) {
   }
 
   const tasks = turboTasks(await promptText("Turbo tasks to run", "build"));
+  const turbo = await turboCommand(context.root);
   const env = { TURBO_API: workerUrl, TURBO_TEAM: team, TURBO_TOKEN: token };
   const verifyStartedAt = Date.now();
   try {
-    await run("pnpm", ["exec", "turbo", "--version"], {
+    await run(turbo.command, [...turbo.args, "--version"], {
+      cwd: context.root,
       label: "Checking local Turbo install",
     });
-    await run("pnpm", ["exec", "turbo", "run", ...tasks, "--cache=local:,remote:w"], {
+    await run(turbo.command, [...turbo.args, "run", ...tasks, "--cache=local:,remote:w"], {
+      cwd: context.root,
       env,
       label: `Running Turbo remote write for ${tasks.join(" ")}`,
       showOutput: true,
     });
-    await rm(".turbo", { force: true, recursive: true });
-    const read = await run("pnpm", ["exec", "turbo", "run", ...tasks, "--cache=local:,remote:r"], {
-      env,
-      label: `Running Turbo remote read for ${tasks.join(" ")}`,
-      showOutput: true,
-    });
+    await rm(turboCachePath(context), { force: true, recursive: true });
+    const read = await run(
+      turbo.command,
+      [...turbo.args, "run", ...tasks, "--cache=local:,remote:r"],
+      {
+        cwd: context.root,
+        env,
+        label: `Running Turbo remote read for ${tasks.join(" ")}`,
+        showOutput: true,
+      },
+    );
     assertTurboCacheHit(read);
     printNote(
       [
@@ -288,13 +309,110 @@ async function maybeVerifyTurboCache(workerUrl, team, token) {
     printNote(
       [
         "Turboflare is deployed, but the optional local Turbo check did not complete.",
-        "If this repo has not installed dependencies yet, run pnpm install and retry your Turbo command with the .env.turboflare values.",
+        `If this repo has not installed dependencies yet, run ${turbo.installCommand} and retry your Turbo command with the .env.turboflare values.`,
         `Turbo verification time before stop: ${formatDuration(Date.now() - verifyStartedAt)}`,
         error instanceof Error ? error.message : String(error),
       ].join("\n"),
       "Turbo cache check skipped",
     );
   }
+}
+
+async function turboContext() {
+  const root = await findTurboRoot(process.cwd());
+  if (root === null) {
+    return null;
+  }
+
+  const configPath = requiredString(await turboConfigPath(root), "Turbo config path");
+  const config = JSON.parse(stripJsonComments(await readFile(configPath, "utf8")));
+  return { config, configPath, root };
+}
+
+async function findTurboRoot(directory) {
+  const current = resolve(directory);
+  const parent = dirname(current);
+  const parentRoot = parent === current ? null : await findTurboRoot(parent);
+  if (parentRoot !== null) {
+    return parentRoot;
+  }
+
+  return (await turboConfigPath(current)) === null ? null : current;
+}
+
+async function turboConfigPath(directory) {
+  const matches = await Promise.all(
+    TURBO_CONFIG_FILES.map(async (file) => {
+      const path = join(directory, file);
+      return (await exists(path)) ? path : null;
+    }),
+  );
+  return matches.find((path) => path !== null) ?? null;
+}
+
+function isRemoteCacheDisabled(config) {
+  return config.remoteCache?.enabled === false || config.global?.remoteCache?.enabled === false;
+}
+
+async function turboCommand(root) {
+  const manager = await packageManager(root);
+  if (manager === "npm") {
+    return { args: ["exec", "turbo", "--"], command: "npm", installCommand: "npm install" };
+  }
+  if (manager === "yarn") {
+    return { args: ["exec", "turbo"], command: "yarn", installCommand: "yarn install" };
+  }
+  if (manager === "bun") {
+    return { args: ["x", "turbo"], command: "bun", installCommand: "bun install" };
+  }
+
+  return { args: ["exec", "turbo"], command: "pnpm", installCommand: "pnpm install" };
+}
+
+async function packageManager(root) {
+  const packageJson = await readJson(join(root, "package.json"));
+  const value = typeof packageJson.packageManager === "string" ? packageJson.packageManager : "";
+  if (value.startsWith("npm@")) {
+    return "npm";
+  }
+  if (value.startsWith("yarn@")) {
+    return "yarn";
+  }
+  if (value.startsWith("bun@")) {
+    return "bun";
+  }
+  if (value.startsWith("pnpm@")) {
+    return "pnpm";
+  }
+  if (
+    (await exists(join(root, "package-lock.json"))) ||
+    (await exists(join(root, "npm-shrinkwrap.json")))
+  ) {
+    return "npm";
+  }
+  if (await exists(join(root, "yarn.lock"))) {
+    return "yarn";
+  }
+  if ((await exists(join(root, "bun.lock"))) || (await exists(join(root, "bun.lockb")))) {
+    return "bun";
+  }
+
+  return "pnpm";
+}
+
+async function readJson(path) {
+  return readFile(path, "utf8")
+    .then((value) => JSON.parse(value))
+    .catch(() => ({}));
+}
+
+function turboCachePath(context) {
+  const cacheDir = context.config.global?.cacheDir ?? context.config.cacheDir;
+  if (typeof cacheDir === "string" && cacheDir.trim().length > 0) {
+    return resolve(context.root, cacheDir);
+  }
+
+  return join(context.root, ".turbo");
 }
 
 function assertTurboCacheHit(result) {
