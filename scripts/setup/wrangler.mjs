@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { access, readFile, writeFile } from "node:fs/promises";
+import { access, readFile, rm, writeFile } from "node:fs/promises";
 import { requiredString, stripJsonComments } from "../shared/jsonc.mjs";
 import {
   fail,
@@ -8,6 +8,7 @@ import {
   promptConfirm,
   promptSecret,
   promptText,
+  commandOutput,
   requireCommand,
   run,
   start,
@@ -96,6 +97,7 @@ async function main() {
   await putSecret("TURBO_TOKEN", token);
   const envWritten = await writeClientEnv(writeEnv, workerUrl, team, token);
   await smoke(workerUrl, token);
+  await maybeVerifyTurboCache(workerUrl, team, token);
 
   const lines = [
     `TURBO_API=${workerUrl}`,
@@ -232,6 +234,77 @@ async function smoke(workerUrl, token) {
   );
 }
 
+async function maybeVerifyTurboCache(workerUrl, team, token) {
+  if (!(await exists("package.json"))) {
+    printNote(
+      "No package.json found in this directory, so setup skipped the optional local Turbo build/test check.",
+      "Turbo cache check skipped",
+    );
+    return;
+  }
+
+  printNote(
+    [
+      "This optional check runs Turbo in this repo twice.",
+      "First run writes to remote cache. Then setup removes .turbo to force a remote read. Second run should report cache hits.",
+      "Only choose this if the selected tasks are safe to run now.",
+    ].join("\n"),
+    "Optional Turbo cache check",
+  );
+
+  if (!(await promptConfirm("Run a real Turbo remote cache check now?", false))) {
+    return;
+  }
+
+  const tasks = turboTasks(await promptText("Turbo tasks to run", "build"));
+  const env = { TURBO_API: workerUrl, TURBO_TEAM: team, TURBO_TOKEN: token };
+  try {
+    await run("pnpm", ["exec", "turbo", "--version"], {
+      label: "Checking local Turbo install",
+    });
+    await run("pnpm", ["exec", "turbo", "run", ...tasks, "--cache=local:,remote:w"], {
+      env,
+      label: `Running Turbo remote write for ${tasks.join(" ")}`,
+      showOutput: true,
+    });
+    await rm(".turbo", { force: true, recursive: true });
+    const read = await run("pnpm", ["exec", "turbo", "run", ...tasks, "--cache=local:,remote:r"], {
+      env,
+      label: `Running Turbo remote read for ${tasks.join(" ")}`,
+      showOutput: true,
+    });
+    assertTurboCacheHit(read);
+    printNote(
+      "Turbo write/read check finished and the second run reported a remote cache hit.",
+      "Turbo cache check complete",
+    );
+  } catch (error) {
+    printNote(
+      [
+        "Turboflare is deployed, but the optional local Turbo check did not complete.",
+        "If this repo has not installed dependencies yet, run pnpm install and retry your Turbo command with the .env.turboflare values.",
+        error instanceof Error ? error.message : String(error),
+      ].join("\n"),
+      "Turbo cache check skipped",
+    );
+  }
+}
+
+function assertTurboCacheHit(result) {
+  const output = commandOutput(result).join("\n");
+  if (/cache hit/i.test(output)) {
+    return;
+  }
+
+  if (/remote caching unavailable|could not connect/i.test(output)) {
+    throw new Error(
+      "Turbo ran, but remote caching was unavailable. Check network/TLS settings and retry.",
+    );
+  }
+
+  throw new Error("Turbo ran, but the second run did not report a remote cache hit.");
+}
+
 async function retrySmoke(check, attempt = 1) {
   const result = await check();
   if (result.health === 200 && result.unauthenticated === 401 && result.authenticated === 200) {
@@ -297,6 +370,15 @@ function teamName(value) {
   }
 
   return value;
+}
+
+function turboTasks(value) {
+  const tasks = value.split(/\s+/).filter(Boolean);
+  if (tasks.length === 0) {
+    throw new Error("At least one Turbo task is required");
+  }
+
+  return tasks;
 }
 
 function normalizeWorkerUrl(value) {

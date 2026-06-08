@@ -19,8 +19,8 @@ Turborepo remote cache should be boring infrastructure: deploy it, set a token, 
 | Path             | Use when                                    | Start here                                               |
 | ---------------- | ------------------------------------------- | -------------------------------------------------------- |
 | Clone-free setup | you want Wrangler to ask and fill values    | [Getting Started](/guide/getting-started/)               |
-| Manual setup     | you want every Cloudflare step explicit     | [Deploy](/guide/deploy/)                                 |
 | Agentic setup    | you want an AI coding agent to do it safely | [Getting Started](/guide/getting-started/#agentic-setup) |
+| Manual setup     | you want every Cloudflare step explicit     | [Deploy](/guide/deploy/)                                 |
 
 ```sh
 pnpm dlx create-turboflare

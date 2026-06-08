@@ -112,6 +112,7 @@ async function main() {
   await putSecret(workdir, "TURBO_TOKEN", token);
   const envWritten = await writeClientEnv(writeEnv, workerUrl, team, token);
   await smoke(workerUrl, token);
+  await maybeVerifyTurboCache(workerUrl, team, token);
 
   const lines = [
     `TURBO_API=${workerUrl}`,
@@ -239,6 +240,77 @@ async function smoke(workerUrl, token) {
   );
 }
 
+async function maybeVerifyTurboCache(workerUrl, team, token) {
+  if (!(await exists("package.json"))) {
+    note(
+      "No package.json found in this directory, so the installer skipped the optional local Turbo build/test check.",
+      "Turbo cache check skipped",
+    );
+    return;
+  }
+
+  note(
+    [
+      "This optional check runs Turbo in this repo twice.",
+      "First run writes to remote cache. Then setup removes .turbo to force a remote read. Second run should report cache hits.",
+      "Only choose this if the selected tasks are safe to run now.",
+    ].join("\n"),
+    "Optional Turbo cache check",
+  );
+
+  if (!(await promptConfirm("Run a real Turbo remote cache check now?", false))) {
+    return;
+  }
+
+  const tasks = turboTasks(await promptText("Turbo tasks to run", "build"));
+  const env = { TURBO_API: workerUrl, TURBO_TEAM: team, TURBO_TOKEN: token };
+  try {
+    await run("pnpm", ["exec", "turbo", "--version"], {
+      label: "Checking local Turbo install",
+    });
+    await run("pnpm", ["exec", "turbo", "run", ...tasks, "--cache=local:,remote:w"], {
+      env,
+      label: `Running Turbo remote write for ${tasks.join(" ")}`,
+      showOutput: true,
+    });
+    await rm(".turbo", { force: true, recursive: true });
+    const read = await run("pnpm", ["exec", "turbo", "run", ...tasks, "--cache=local:,remote:r"], {
+      env,
+      label: `Running Turbo remote read for ${tasks.join(" ")}`,
+      showOutput: true,
+    });
+    assertTurboCacheHit(read);
+    note(
+      "Turbo write/read check finished and the second run reported a remote cache hit.",
+      "Turbo cache check complete",
+    );
+  } catch (error) {
+    note(
+      [
+        "Turboflare is deployed, but the optional local Turbo check did not complete.",
+        "If this repo has not installed dependencies yet, run pnpm install and retry your Turbo command with the .env.turboflare values.",
+        error instanceof Error ? error.message : String(error),
+      ].join("\n"),
+      "Turbo cache check skipped",
+    );
+  }
+}
+
+function assertTurboCacheHit(result) {
+  const output = commandOutput(result).join("\n");
+  if (/cache hit/i.test(output)) {
+    return;
+  }
+
+  if (/remote caching unavailable|could not connect/i.test(output)) {
+    throw new Error(
+      "Turbo ran, but remote caching was unavailable. Check network/TLS settings and retry.",
+    );
+  }
+
+  throw new Error("Turbo ran, but the second run did not report a remote cache hit.");
+}
+
 async function retrySmoke(check, attempt = 1) {
   const result = await check();
   if (result.health === 200 && result.unauthenticated === 401 && result.authenticated === 200) {
@@ -280,19 +352,36 @@ async function run(command, args, options = {}) {
   const result = await withStep(options.label ?? `${command} ${args.join(" ")}`, () =>
     execa(command, args, {
       cwd: options.cwd,
+      env: options.env,
       input: options.input,
       reject: false,
     }),
   );
 
   if (result.exitCode !== 0 && options.reject !== false) {
-    const details = [result.stderr, result.stdout].filter(Boolean).join("\n");
+    const details = commandOutput(result).join("\n");
     throw new Error(
       `${command} ${args.join(" ")} failed with exit code ${result.exitCode}${details ? `\n${details}` : ""}`,
     );
   }
 
+  if (options.showOutput) {
+    for (const value of commandOutput(result)) {
+      process.stdout.write(value);
+      if (!value.endsWith("\n")) {
+        process.stdout.write("\n");
+      }
+    }
+  }
+
   return result;
+}
+
+function commandOutput(result) {
+  return [result.stderr, result.stdout]
+    .filter((value) => typeof value === "string" && value.trim().length > 0)
+    .flatMap((value) => value.split(/\r?\n/))
+    .filter((value) => value.trim().length > 0 && value.trim() !== "undefined");
 }
 
 async function requireCommand(command, args, message) {
@@ -373,6 +462,15 @@ function teamName(value) {
   }
 
   return value;
+}
+
+function turboTasks(value) {
+  const tasks = value.split(/\s+/).filter(Boolean);
+  if (tasks.length === 0) {
+    throw new Error("At least one Turbo task is required");
+  }
+
+  return tasks;
 }
 
 function normalizeWorkerUrl(value) {

@@ -62,19 +62,36 @@ export async function run(command, args, options = {}) {
   const result = await withStep(options.label ?? `${command} ${args.join(" ")}`, () =>
     execa(command, args, {
       cwd: options.cwd,
+      env: options.env,
       input: options.input,
       reject: false,
     }),
   );
 
   if (result.exitCode !== 0 && options.reject !== false) {
-    const details = [result.stderr, result.stdout].filter(Boolean).join("\n");
+    const details = commandOutput(result).join("\n");
     throw new Error(
       `${command} ${args.join(" ")} failed with exit code ${result.exitCode}${details ? `\n${details}` : ""}`,
     );
   }
 
+  if (options.showOutput) {
+    for (const value of commandOutput(result)) {
+      process.stdout.write(value);
+      if (!value.endsWith("\n")) {
+        process.stdout.write("\n");
+      }
+    }
+  }
+
   return result;
+}
+
+export function commandOutput(result) {
+  return [result.stderr, result.stdout]
+    .filter((value) => typeof value === "string" && value.trim().length > 0)
+    .flatMap((value) => value.split(/\r?\n/))
+    .filter((value) => value.trim().length > 0 && value.trim() !== "undefined");
 }
 
 export async function requireCommand(command, args, message) {
