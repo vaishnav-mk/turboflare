@@ -105,9 +105,11 @@ Overrides:
 | `ABORT_MULTIPART_DAYS` | multipart upload max age              |
 | `R2_JURISDICTION`      | add jurisdiction header               |
 
-## Worker cleanup cron
+## Optional Worker cleanup cron
 
-The Worker also runs scheduled cleanup:
+R2 lifecycle is the default retention path for normal deployments. You can also enable scheduled Worker cleanup when you need branch-specific retention, KV cleanup, or D1 index cleanup.
+
+Add this to `wrangler.jsonc` if you want the Worker cron:
 
 ```jsonc
 "triggers": {
@@ -115,7 +117,7 @@ The Worker also runs scheduled cleanup:
 }
 ```
 
-It scans `v1/` and deletes expired objects up to `CLEANUP_MAX_DELETE`.
+When enabled, it scans `v1/` and deletes expired objects up to `CLEANUP_MAX_DELETE`.
 
 Keep Worker cleanup when using:
 
@@ -125,7 +127,7 @@ Keep Worker cleanup when using:
 | D1 artifact index | index rows need cleanup when artifacts are deleted |
 | branch retention  | branch artifacts can use `BRANCH_RETENTION_DAYS`   |
 
-For a simple R2-only deployment, R2 lifecycle is the primary retention mechanism. Worker cleanup is a bounded backup and advanced-feature cleanup path.
+For a simple R2-only deployment, R2 lifecycle is the primary retention mechanism. Worker cleanup is an optional bounded backup and advanced-feature cleanup path.
 
 ## KV fallback
 

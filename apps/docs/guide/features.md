@@ -38,7 +38,7 @@ See [API Reference](/reference/api/) for exact route shapes.
 | Upload size cap       | `MAX_ARTIFACT_BYTES`                 | Defaults to 500 MiB; no-length uploads are bounded.                            |
 | Versioned object keys | default                              | Keys use `v1/team/...`; branch keys add `/branch/...`.                         |
 | R2 lifecycle helper   | `pnpm r2:lifecycle`                  | Applies bucket lifecycle rules through Cloudflare API.                         |
-| Scheduled cleanup     | cron in `wrangler.jsonc`             | Deletes expired stored artifacts up to `CLEANUP_MAX_DELETE`.                   |
+| Scheduled cleanup     | optional cron in `wrangler.jsonc`    | Deletes expired stored artifacts up to `CLEANUP_MAX_DELETE`.                   |
 | Manual expired purge  | `INTERNAL_ADMIN_TOKEN`               | `POST /internal/artifacts/purge-expired`.                                      |
 
 ## Auth And Tenancy

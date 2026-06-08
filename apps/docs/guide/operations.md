@@ -15,6 +15,8 @@ This page covers production knobs, admin routes, observability, and troubleshoot
 | observability  | keep Worker observability enabled                       |
 | rate limits    | bind `RATE_LIMITER` for hosted/multi-tenant deployments |
 
+Cron cleanup is optional. Keep first deploys simple; add a Wrangler `triggers.crons` entry only if you need Worker-managed cleanup in addition to R2 lifecycle.
+
 ## Internal routes
 
 All `/internal/*` routes require `INTERNAL_ADMIN_TOKEN`.

@@ -6,9 +6,6 @@
     "enabled": true,
     "head_sampling_rate": 1,
   },
-  "triggers": {
-    "crons": ["17 3 * * *"],
-  },
   "vars": {
     "ANALYTICS_DATASET": "turboflare_metrics",
     "CACHE_STATUS": "enabled",

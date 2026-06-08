@@ -33,7 +33,7 @@ Default R2 binding:
 | `DEFAULT_BRANCH`        | branch name                                                | `main`           | mainline branch for branch policies                 |
 | `RETENTION_DAYS`        | number                                                     | `30`             | Worker cleanup and lifecycle default                |
 | `BRANCH_RETENTION_DAYS` | number                                                     | `RETENTION_DAYS` | shorter branch cleanup                              |
-| `CLEANUP_MAX_DELETE`    | number                                                     | `1000`           | max deletes per scheduled cleanup                   |
+| `CLEANUP_MAX_DELETE`    | number                                                     | `1000`           | max deletes per optional scheduled cleanup          |
 | `MAX_ARTIFACT_BYTES`    | bytes                                                      | `524288000`      | upload cap; no-length uploads buffer up to this cap |
 | `CACHE_API_READS`       | `true`, `false`                                            | `false`          | fill Cloudflare Cache API after R2 reads            |
 | `CACHE_API_MAX_BYTES`   | bytes                                                      | `10485760`       | largest Cache API-eligible artifact                 |
