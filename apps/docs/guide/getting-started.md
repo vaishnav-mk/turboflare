@@ -34,6 +34,14 @@ It downloads Turboflare to a temporary directory, asks for the few values that c
 
 The generated `.env.turboflare` file is ignored by git.
 
+## What is `TURBO_TEAM`?
+
+`TURBO_TEAM` is Turbo's cache namespace. Turboflare uses it to keep cache artifacts grouped under a stable name.
+
+Use a short repo or org name, for example `acme-web` or `my-app`. Use the same value in local dev and CI if you want both places to share cache artifacts.
+
+`TURBO_TEAM` does not need to match a real Vercel team when you use Turboflare.
+
 Use it in your app shell:
 
 ```sh

@@ -41,16 +41,37 @@ async function main() {
 
   await preflight();
 
+  printNote(
+    [
+      "TURBO_TEAM is Turbo's namespace for cache entries.",
+      "Use a stable short name for this repo or org, for example acme-web or my-app.",
+      "Use the same value in local dev and CI when you want them to share cache artifacts.",
+    ].join("\n"),
+    "Turbo team name",
+  );
   const team = teamName(await promptText("Turbo team name", defaultTeamName()));
+
+  printNote(
+    [
+      "TURBO_TOKEN is the password Turbo sends to the Worker.",
+      "Generating one is easiest. Setup stores it as a Worker secret if you choose to deploy now.",
+    ].join("\n"),
+    "Turbo token",
+  );
   const token = await turboToken();
+
+  printNote(
+    [
+      ".env.turboflare stores TURBO_API, TURBO_TEAM, and TURBO_TOKEN for local Turbo commands.",
+      "Do not commit it. The repo gitignore excludes it.",
+    ].join("\n"),
+    "Local env file",
+  );
   const writeEnv = await promptConfirm(`Write ${DEFAULT_ENV_FILE} for local Turbo commands?`, true);
   const deploy = await promptConfirm(
     "Create R2 bucket, deploy Worker, and set TURBO_TOKEN now?",
     true,
   );
-
-  await ensureDependencies();
-  await ensureWranglerLogin();
 
   if (!deploy) {
     await writeClientEnv(writeEnv, null, team, token);
@@ -59,7 +80,12 @@ async function main() {
     return;
   }
 
+  await ensureDependencies();
+  await ensureWranglerLogin();
   await createBucket(bucketName);
+  await run("pnpm", ["--filter", "@turboflare/protocol", "build"], {
+    label: "Building shared protocol package",
+  });
   const deployResult = await run("pnpm", ["--filter", "@turboflare/cache-worker", "deploy"], {
     label: "Deploying Worker",
   });
@@ -116,6 +142,7 @@ async function turboToken() {
 }
 
 async function ensureWranglerLogin() {
+  printNote("Wrangler tells Cloudflare which account to deploy into.", "Checking Wrangler login");
   const result = await run(
     "pnpm",
     ["--filter", "@turboflare/cache-worker", "exec", "wrangler", "whoami"],
@@ -138,6 +165,7 @@ async function ensureWranglerLogin() {
 }
 
 async function createBucket(bucketName) {
+  printNote(`R2 bucket ${bucketName} stores Turbo cache artifact files.`, "Creating R2 bucket");
   const result = await run(
     "pnpm",
     [
@@ -165,6 +193,7 @@ async function createBucket(bucketName) {
 }
 
 async function putSecret(name, value) {
+  printNote(`Secret ${name} is stored by Cloudflare, not in Worker code.`, "Setting Worker secret");
   await run(
     "pnpm",
     ["--filter", "@turboflare/cache-worker", "exec", "wrangler", "secret", "put", name],
@@ -173,6 +202,10 @@ async function putSecret(name, value) {
 }
 
 async function smoke(workerUrl, token) {
+  printNote(
+    "These checks confirm the Worker is live, rejects missing auth, and accepts your token.",
+    "Smoke checks",
+  );
   const base = workerUrl.replace(/\/$/, "");
   const [health, unauthenticated, authenticated] = await withStep("Running smoke checks", () =>
     Promise.all([

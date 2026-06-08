@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { confirm, intro, isCancel, note, outro, password, spinner, text } from "@clack/prompts";
+import { confirm, intro, isCancel, note, outro, password, text } from "@clack/prompts";
 import { randomBytes } from "node:crypto";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -42,14 +42,41 @@ try {
 async function main() {
   intro("Create Turboflare");
   note(
-    "Downloads Turboflare to a temp directory, deploys it, sets TURBO_TOKEN, then removes the temp checkout.",
+    [
+      "This runs from your app repo. It downloads Turboflare to a temporary directory, deploys the Worker, then deletes the temporary checkout.",
+      "You need a Wrangler login because the installer creates Cloudflare resources in your account.",
+    ].join("\n"),
     "What this does",
   );
 
   await preflight();
 
+  note(
+    [
+      "TURBO_TEAM is just Turbo's namespace for cache entries.",
+      "Use a stable short name for this repo or org, for example acme-web or my-app.",
+      "Use the same TURBO_TEAM in local dev and CI when you want them to share cache artifacts.",
+    ].join("\n"),
+    "Turbo team name",
+  );
   const team = teamName(await promptText("Turbo team name", defaultTeamName()));
+
+  note(
+    [
+      "TURBO_TOKEN is the password Turbo sends to your Worker.",
+      "Generating one is easiest. The installer stores it as a Worker secret and writes it to .env.turboflare if you choose that option.",
+    ].join("\n"),
+    "Turbo token",
+  );
   const token = await turboToken();
+
+  note(
+    [
+      ".env.turboflare is for your app shell only. It contains TURBO_API, TURBO_TEAM, and TURBO_TOKEN.",
+      "Do not commit it. The repo gitignore excludes it.",
+    ].join("\n"),
+    "Local env file",
+  );
   const writeEnv = await promptConfirm(`Write ${DEFAULT_ENV_FILE} in this directory?`, true);
   const source = process.env.TURBOFLARE_SOURCE ?? DEFAULT_SOURCE;
 
@@ -66,6 +93,10 @@ async function main() {
   await run("pnpm", ["install", "--frozen-lockfile"], {
     cwd: workdir,
     label: "Installing dependencies",
+  });
+  await run("pnpm", ["--filter", "@turboflare/protocol", "build"], {
+    cwd: workdir,
+    label: "Building shared protocol package",
   });
   await ensureWranglerLogin(workdir);
   await createBucket(workdir, bucketName);
@@ -117,6 +148,7 @@ async function turboToken() {
 }
 
 async function ensureWranglerLogin(repo) {
+  info("Checking Wrangler login. Wrangler tells Cloudflare which account to deploy into.");
   const result = await run(
     "pnpm",
     ["--filter", "@turboflare/cache-worker", "exec", "wrangler", "whoami"],
@@ -141,6 +173,7 @@ async function ensureWranglerLogin(repo) {
 }
 
 async function createBucket(repo, bucketName) {
+  info(`Creating R2 bucket ${bucketName}. R2 stores Turbo cache artifact files.`);
   const result = await run(
     "pnpm",
     [
@@ -168,6 +201,7 @@ async function createBucket(repo, bucketName) {
 }
 
 async function putSecret(repo, name, value) {
+  info(`Setting Worker secret ${name}. Secrets are stored by Cloudflare, not in Worker code.`);
   await run(
     "pnpm",
     ["--filter", "@turboflare/cache-worker", "exec", "wrangler", "secret", "put", name],
@@ -176,6 +210,9 @@ async function putSecret(repo, name, value) {
 }
 
 async function smoke(workerUrl, token) {
+  info(
+    "Running smoke checks. These confirm the Worker is live, rejects missing auth, and accepts your token.",
+  );
   const base = workerUrl.replace(/\/$/, "");
   const [health, unauthenticated, authenticated] = await withStep("Running smoke checks", () =>
     Promise.all([
@@ -283,19 +320,13 @@ async function promptConfirm(label, defaultValue) {
 }
 
 async function withStep(label, task) {
-  if (!isInteractive) {
-    output.write(`${label}\n`);
-    return task();
-  }
-
-  const spin = spinner();
-  spin.start(label);
+  output.write(`◇ ${label}\n`);
   try {
     const result = await task();
-    spin.stop(label);
+    output.write(`◇ ${label} done\n`);
     return result;
   } catch (error) {
-    spin.stop(`${label} failed`);
+    output.write(`◇ ${label} failed\n`);
     throw error;
   }
 }

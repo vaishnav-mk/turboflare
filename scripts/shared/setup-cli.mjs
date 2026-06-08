@@ -1,4 +1,4 @@
-import { confirm, intro, isCancel, note, outro, password, spinner, text } from "@clack/prompts";
+import { confirm, intro, isCancel, note, outro, password, text } from "@clack/prompts";
 import { stdin as input, stdout as output } from "node:process";
 import { execa } from "execa";
 
@@ -85,19 +85,13 @@ export async function requireCommand(command, args, message) {
 }
 
 export async function withStep(label, task) {
-  if (!isInteractive) {
-    output.write(`${label}\n`);
-    return task();
-  }
-
-  const spin = spinner();
-  spin.start(label);
+  output.write(`◇ ${label}\n`);
   try {
     const result = await task();
-    spin.stop(label);
+    output.write(`◇ ${label} done\n`);
     return result;
   } catch (error) {
-    spin.stop(`${label} failed`);
+    output.write(`◇ ${label} failed\n`);
     throw error;
   }
 }
