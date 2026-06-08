@@ -36,7 +36,7 @@ Use this path unless the user asks for advanced features.
 For normal users, prefer clone-free setup. Do not clone Turboflare into their app repo just to deploy it:
 
 ```sh
-pnpm dlx "github:vaishnav-mk/turboflare#path:packages/create-turboflare"
+pnpm dlx create-turboflare
 ```
 
 If the current repo is Turboflare itself, use the source-checkout guided setup script:

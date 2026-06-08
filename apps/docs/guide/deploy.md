@@ -5,7 +5,7 @@ Turboflare has two deploy paths: one-click deploy for quick setup, and manual Wr
 If you want Turboflare to ask questions and fill the standard values without keeping a source checkout, use clone-free setup instead:
 
 ```sh
-pnpm dlx "github:vaishnav-mk/turboflare#path:packages/create-turboflare"
+pnpm dlx create-turboflare
 ```
 
 ## One-click deploy
