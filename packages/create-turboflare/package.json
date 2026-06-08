@@ -1,0 +1,21 @@
+{
+  "name": "create-turboflare",
+  "version": "0.0.0",
+  "description": "clone-free Turboflare installer",
+  "license": "MIT",
+  "bin": {
+    "create-turboflare": "bin/create-turboflare.mjs"
+  },
+  "files": [
+    "bin"
+  ],
+  "type": "module",
+  "scripts": {
+    "start": "node bin/create-turboflare.mjs"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.5.1",
+    "execa": "^9.6.1",
+    "giget": "^3.2.0"
+  }
+}

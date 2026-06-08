@@ -17,11 +17,14 @@
     "prune:smoke": "node scripts/ci/prune-smoke.mjs",
     "r2:lifecycle": "node scripts/r2/put-lifecycle.mjs",
     "r2:lifecycle:dry-run": "node scripts/r2/put-lifecycle.mjs --dry-run",
+    "setup": "node scripts/setup/wrangler.mjs",
     "test": "turbo run test",
     "test:integration": "turbo run test:integration",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
+    "@clack/prompts": "^1.5.1",
+    "execa": "^9.6.1",
     "oxfmt": "^0.53.0",
     "oxlint": "^1.68.0",
     "turbo": "^2.6.1",
