@@ -14,7 +14,7 @@ import {
   turboContext,
 } from "./turbo-context.mjs";
 
-const DEFAULT_SOURCE = "github:vaishnav-mk/turboflare#main";
+const DEFAULT_SOURCE = "github:vaishnav-mk/turboflare#v0.1.13";
 const DEFAULT_ENV_FILE = ".env.turboflare";
 const MIN_NODE_MAJOR = 20;
 
@@ -80,7 +80,7 @@ async function main() {
   note(
     [
       ".env.turboflare is for your app shell only. It contains TURBO_API, TURBO_TEAM, and TURBO_TOKEN.",
-      "Do not commit it. The repo gitignore excludes it.",
+      "Do not commit it. Add .env.turboflare or .env.* to your app repo's ignore rules if needed.",
     ].join("\n"),
     "Local env file",
   );
@@ -294,6 +294,7 @@ async function maybeVerifyTurboCache(workerUrl, team, token) {
       cwd: context.root,
       env,
       label: `Running Turbo remote write for ${tasks.join(" ")}`,
+      redact: [token],
       showOutput: true,
     });
     await rm(turboCachePath(context), { force: true, recursive: true });
@@ -304,6 +305,7 @@ async function maybeVerifyTurboCache(workerUrl, team, token) {
         cwd: context.root,
         env,
         label: `Running Turbo remote read for ${tasks.join(" ")}`,
+        redact: [token],
         showOutput: true,
       },
     );
@@ -389,14 +391,14 @@ async function run(command, args, options = {}) {
   );
 
   if (result.exitCode !== 0 && options.reject !== false) {
-    const details = commandOutput(result).join("\n");
+    const details = commandOutput(result, options.redact).join("\n");
     throw new Error(
       `${command} ${args.join(" ")} failed with exit code ${result.exitCode}${details ? `\n${details}` : ""}`,
     );
   }
 
   if (options.showOutput) {
-    for (const value of commandOutput(result)) {
+    for (const value of commandOutput(result, options.redact)) {
       process.stdout.write(value);
       if (!value.endsWith("\n")) {
         process.stdout.write("\n");
@@ -407,11 +409,19 @@ async function run(command, args, options = {}) {
   return result;
 }
 
-function commandOutput(result) {
+function commandOutput(result, redactions = []) {
   return [result.stderr, result.stdout]
     .filter((value) => typeof value === "string" && value.trim().length > 0)
     .flatMap((value) => value.split(/\r?\n/))
-    .filter((value) => value.trim().length > 0 && value.trim() !== "undefined");
+    .filter((value) => value.trim().length > 0 && value.trim() !== "undefined")
+    .map((value) => redact(value, redactions));
+}
+
+function redact(value, redactions) {
+  return redactions.reduce(
+    (current, secret) => (secret.length === 0 ? current : current.split(secret).join("[redacted]")),
+    value,
+  );
 }
 
 async function requireCommand(command, args, message) {

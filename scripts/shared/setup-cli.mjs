@@ -69,14 +69,14 @@ export async function run(command, args, options = {}) {
   );
 
   if (result.exitCode !== 0 && options.reject !== false) {
-    const details = commandOutput(result).join("\n");
+    const details = commandOutput(result, options.redact).join("\n");
     throw new Error(
       `${command} ${args.join(" ")} failed with exit code ${result.exitCode}${details ? `\n${details}` : ""}`,
     );
   }
 
   if (options.showOutput) {
-    for (const value of commandOutput(result)) {
+    for (const value of commandOutput(result, options.redact)) {
       process.stdout.write(value);
       if (!value.endsWith("\n")) {
         process.stdout.write("\n");
@@ -87,11 +87,19 @@ export async function run(command, args, options = {}) {
   return result;
 }
 
-export function commandOutput(result) {
+export function commandOutput(result, redactions = []) {
   return [result.stderr, result.stdout]
     .filter((value) => typeof value === "string" && value.trim().length > 0)
     .flatMap((value) => value.split(/\r?\n/))
-    .filter((value) => value.trim().length > 0 && value.trim() !== "undefined");
+    .filter((value) => value.trim().length > 0 && value.trim() !== "undefined")
+    .map((value) => redact(value, redactions));
+}
+
+function redact(value, redactions) {
+  return redactions.reduce(
+    (current, secret) => (secret.length === 0 ? current : current.split(secret).join("[redacted]")),
+    value,
+  );
 }
 
 export async function requireCommand(command, args, message) {

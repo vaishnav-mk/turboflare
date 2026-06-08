@@ -71,7 +71,7 @@ async function main() {
   printNote(
     [
       ".env.turboflare stores TURBO_API, TURBO_TEAM, and TURBO_TOKEN for local Turbo commands.",
-      "Do not commit it. The repo gitignore excludes it.",
+      "Do not commit it. Add .env.turboflare or .env.* to your app repo's ignore rules if needed.",
     ].join("\n"),
     "Local env file",
   );
@@ -288,6 +288,7 @@ async function maybeVerifyTurboCache(workerUrl, team, token) {
       cwd: context.root,
       env,
       label: `Running Turbo remote write for ${tasks.join(" ")}`,
+      redact: [token],
       showOutput: true,
     });
     await rm(turboCachePath(context), { force: true, recursive: true });
@@ -298,6 +299,7 @@ async function maybeVerifyTurboCache(workerUrl, team, token) {
         cwd: context.root,
         env,
         label: `Running Turbo remote read for ${tasks.join(" ")}`,
+        redact: [token],
         showOutput: true,
       },
     );
