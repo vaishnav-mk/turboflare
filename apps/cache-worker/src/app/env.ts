@@ -21,6 +21,8 @@ export enum SignaturePolicy {
 
 export interface Env {
   ANALYTICS?: AnalyticsEngineDataset;
+  ANALYTICS_API_TOKEN?: string;
+  ANALYTICS_DATASET?: string;
   ARTIFACT_INDEX?: D1Database;
   ARTIFACT_STORE?: string;
   ARTIFACTS_KV?: KVNamespace;
@@ -31,6 +33,7 @@ export interface Env {
   CACHE_API_READS?: string;
   CACHE_STATUS?: string;
   CLEANUP_MAX_DELETE?: string;
+  CLOUDFLARE_ACCOUNT_ID?: string;
   DEFAULT_BRANCH?: string;
   INTERNAL_ADMIN_TOKEN?: string;
   MAX_ARTIFACT_BYTES?: string;

@@ -144,6 +144,9 @@ Returns an empty event history response for Turbo compatibility.
 | `/internal/teams/:team/stats`       | `GET`  | team object count and bytes |
 | `/internal/teams/:team/purge-all`   | `POST` | delete team artifacts       |
 | `/internal/artifacts/purge-expired` | `POST` | run retention cleanup       |
+| `/internal/metrics/summary`         | `GET`  | usage summary               |
 | `/internal/tokens`                  | `GET`  | list D1 tokens              |
 | `/internal/tokens`                  | `POST` | create D1 token             |
 | `/internal/tokens/:id/revoke`       | `POST` | revoke D1 token             |
+
+Metrics summary supports `?window=15m`, `?window=1h`, `?window=6h`, and `?window=24h`. It requires `CLOUDFLARE_ACCOUNT_ID`, `ANALYTICS_DATASET`, and `ANALYTICS_API_TOKEN`.

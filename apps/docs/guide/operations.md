@@ -19,15 +19,16 @@ This page covers production knobs, admin routes, observability, and troubleshoot
 
 All `/internal/*` routes require `INTERNAL_ADMIN_TOKEN`.
 
-| Route                               | Method | Purpose                       |
-| ----------------------------------- | ------ | ----------------------------- |
-| `/internal/health`                  | `GET`  | internal health check         |
-| `/internal/teams/:team/stats`       | `GET`  | object count and total bytes  |
-| `/internal/teams/:team/purge-all`   | `POST` | delete artifacts for one team |
-| `/internal/artifacts/purge-expired` | `POST` | run cleanup immediately       |
-| `/internal/tokens`                  | `GET`  | list D1 tokens                |
-| `/internal/tokens`                  | `POST` | create D1 token               |
-| `/internal/tokens/:id/revoke`       | `POST` | revoke D1 token               |
+| Route                               | Method | Purpose                        |
+| ----------------------------------- | ------ | ------------------------------ |
+| `/internal/health`                  | `GET`  | internal health check          |
+| `/internal/teams/:team/stats`       | `GET`  | object count and total bytes   |
+| `/internal/teams/:team/purge-all`   | `POST` | delete artifacts for one team  |
+| `/internal/artifacts/purge-expired` | `POST` | run cleanup immediately        |
+| `/internal/metrics/summary`         | `GET`  | Analytics Engine usage summary |
+| `/internal/tokens`                  | `GET`  | list D1 tokens                 |
+| `/internal/tokens`                  | `POST` | create D1 token                |
+| `/internal/tokens/:id/revoke`       | `POST` | revoke D1 token                |
 
 ## Artifact index
 
@@ -48,6 +49,16 @@ Use it when you want admin/search/reporting features. Skip it for the smallest W
 ## Analytics Engine
 
 Bind `ANALYTICS` to record non-blocking datapoints for status, preflight, upload, hit, miss, and event requests.
+
+Set these only if you want `/internal/metrics/summary` to query Analytics Engine from the Worker:
+
+| Variable                | Purpose                                      |
+| ----------------------- | -------------------------------------------- |
+| `CLOUDFLARE_ACCOUNT_ID` | account that owns the Analytics Engine table |
+| `ANALYTICS_DATASET`     | Analytics Engine dataset/table name          |
+| `ANALYTICS_API_TOKEN`   | token with Account Analytics Read            |
+
+Supported summary windows are `15m`, `1h`, `6h`, and `24h`. Missing query config returns `503`.
 
 Metric shape:
 

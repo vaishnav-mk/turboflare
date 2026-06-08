@@ -25,6 +25,7 @@ export interface RoutePathMap {
   Root: "/";
   ManagementHealth: "/management/health";
   InternalHealth: `${InternalRoutePrefix}/health`;
+  InternalMetricsSummary: `${InternalRoutePrefix}/metrics/summary`;
   InternalArtifactsPurgeExpired: `${InternalRoutePrefix}/artifacts/purge-expired`;
   InternalTeams: `${InternalRoutePrefix}/teams`;
   InternalTokens: `${InternalRoutePrefix}/tokens`;
@@ -39,6 +40,7 @@ export const RoutePath: RoutePathMap = {
   Root: "/",
   ManagementHealth: "/management/health",
   InternalHealth: `${RoutePrefix.Internal}/health`,
+  InternalMetricsSummary: `${RoutePrefix.Internal}/metrics/summary`,
   InternalArtifactsPurgeExpired: `${RoutePrefix.Internal}/artifacts/purge-expired`,
   InternalTeams: `${RoutePrefix.Internal}/teams`,
   InternalTokens: `${RoutePrefix.Internal}/tokens`,

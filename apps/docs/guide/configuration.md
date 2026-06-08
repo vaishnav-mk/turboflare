@@ -39,6 +39,16 @@ Default R2 binding:
 | `CACHE_API_MAX_BYTES`   | bytes                                                      | `10485760`       | largest Cache API-eligible artifact                 |
 | `ARTIFACT_STORE`        | `r2`, `kv`                                                 | `r2`             | choose R2 or KV artifact store                      |
 
+## Metrics query variables
+
+Set these only if using `GET /internal/metrics/summary`:
+
+| Name                    | Purpose                                      |
+| ----------------------- | -------------------------------------------- |
+| `CLOUDFLARE_ACCOUNT_ID` | account that owns the Analytics Engine table |
+| `ANALYTICS_DATASET`     | Analytics Engine dataset/table name          |
+| `ANALYTICS_API_TOKEN`   | secret with Account Analytics Read           |
+
 ## Optional bindings
 
 | Binding          | Purpose                                    |

@@ -1,6 +1,6 @@
 import { env as workerEnv } from "cloudflare:workers";
 import { SELF, createExecutionContext, reset, waitOnExecutionContext } from "cloudflare:test";
-import { afterEach, describe, it } from "vitest";
+import { afterEach, describe, it, vi } from "vitest";
 
 import {
   ARTIFACTS_PATH,
@@ -45,6 +45,7 @@ interface InternalAdminFixture {
 }
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await reset();
 });
 
@@ -267,6 +268,82 @@ describe("cache worker", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ deleted: 1, scanned: 2 });
     expect(bucket.deleted).toEqual([`v1/team/${TEAM_ID}/artifact/old`]);
+  });
+
+  it("requires analytics query config for internal metrics summary", async ({ expect }) => {
+    const admin = internalAdmin({
+      ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS,
+    } satisfies Env);
+
+    const response = await handleRequest(
+      internalRequest(RoutePath.InternalMetricsSummary, admin),
+      admin.env,
+      createExecutionContext(),
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: { code: "unavailable", message: "Analytics query access is not configured" },
+    });
+  });
+
+  it("returns internal metrics summary from Analytics Engine", async ({ expect }) => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          bytes: 1234,
+          errors: 2,
+          events: 4,
+          getHits: 8,
+          getMisses: 2,
+          headHits: 3,
+          headMisses: 1,
+          preflights: 5,
+          puts: 6,
+          requests: 31,
+          signatureMissing: 1,
+          status: 7,
+        }),
+      ),
+    );
+    const admin = internalAdmin({
+      ANALYTICS_API_TOKEN: "analytics-token",
+      ANALYTICS_DATASET: "turboflare_metrics",
+      ARTIFACTS: (workerEnv as unknown as Env).ARTIFACTS,
+      CLOUDFLARE_ACCOUNT_ID: "account-id",
+    } satisfies Env);
+
+    const response = await handleRequest(
+      internalRequest(`${RoutePath.InternalMetricsSummary}?window=15m`, admin),
+      admin.env,
+      createExecutionContext(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      bytes: 1234,
+      errors: 2,
+      events: 4,
+      getHits: 8,
+      getMisses: 2,
+      headHits: 3,
+      headMisses: 1,
+      hitRate: 0.8,
+      preflights: 5,
+      puts: 6,
+      requests: 31,
+      signatureMissing: 1,
+      status: 7,
+      window: "15m",
+    });
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://api.cloudflare.com/client/v4/accounts/account-id/analytics_engine/sql",
+      expect.objectContaining({
+        body: expect.stringContaining("FROM turboflare_metrics"),
+        headers: { Authorization: "Bearer analytics-token" },
+        method: "POST",
+      }),
+    );
   });
 
   it("requires token database for internal token routes", async ({ expect }) => {

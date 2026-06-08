@@ -4,6 +4,7 @@ import type { Env } from "../../app/env";
 import { requireInternalAdmin } from "../../auth/internal";
 import { ErrorCode, errorResponse, methodNotAllowed } from "../../http/response";
 import { handleInternalArtifacts } from "./artifacts";
+import { handleInternalMetrics } from "./metrics";
 import { handleInternalTeam } from "./team";
 import { handleInternalTokens } from "./tokens";
 
@@ -32,6 +33,11 @@ export async function handleInternal(request: Request, env: Env): Promise<Respon
   const artifacts = await handleInternalArtifacts(request, env);
   if (artifacts !== null) {
     return artifacts;
+  }
+
+  const metrics = await handleInternalMetrics(request, env);
+  if (metrics !== null) {
+    return metrics;
   }
 
   const tokens = await handleInternalTokens(request, env);
