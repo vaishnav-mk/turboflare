@@ -63,6 +63,8 @@ The second run should report a remote `cache hit`.
 
 Use this when a coding agent has access to your shell and repo.
 
+For the standalone agent prompt and acceptance checklist, see [Agentic Setup](/guide/agentic-setup/).
+
 Give the agent this prompt:
 
 ```txt

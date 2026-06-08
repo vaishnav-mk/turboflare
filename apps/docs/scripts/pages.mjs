@@ -7,6 +7,12 @@ export const pages = [
     section: "Start",
   },
   {
+    source: "guide/agentic-setup.md",
+    output: "guide/agentic-setup/index.html",
+    title: "Agentic Setup",
+    section: "Start",
+  },
+  {
     source: "guide/deploy.md",
     output: "guide/deploy/index.html",
     title: "Deploy",
