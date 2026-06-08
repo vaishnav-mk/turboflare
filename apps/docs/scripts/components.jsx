@@ -17,9 +17,13 @@ import {
   Globe,
   ShieldCheck,
   TreeStructure,
+  List,
+  X,
 } from "@phosphor-icons/react";
 
 const REPO = "https://github.com/vaishnav-mk/turboflare";
+const ISSUES = `${REPO}/issues`;
+const TWITTER = "https://x.com/wishee0";
 const DEPLOY = "https://deploy.workers.cloudflare.com/?url=" + REPO;
 
 function LinkButton({ href, className, children, ...rest }) {
@@ -53,6 +57,14 @@ function SidebarNav({ pages, hrefFor, current }) {
             <img src="/logo.svg" alt="Turboflare logo" width={20} height={20} />
             <span className="brand-name">Turboflare</span>
           </a>
+          <button
+            className="sidebar-close"
+            type="button"
+            data-nav-close="true"
+            aria-label="Close menu"
+          >
+            <X size={16} weight="bold" />
+          </button>
         </div>
         <nav className="sidebar-nav">
           {sections.map((section) => {
@@ -116,6 +128,16 @@ function SidebarNav({ pages, hrefFor, current }) {
             <span>GitHub</span>
             <ArrowSquareOut size={10} className="sidebar-ext" />
           </a>
+          <a href={ISSUES} className="sidebar-gh" target="_blank" rel="noopener">
+            <GithubLogo size={14} weight="bold" />
+            <span>Issues</span>
+            <ArrowSquareOut size={10} className="sidebar-ext" />
+          </a>
+          <a href={TWITTER} className="sidebar-gh" target="_blank" rel="noopener">
+            <span className="sidebar-mark">X</span>
+            <span>@wishee0</span>
+            <ArrowSquareOut size={10} className="sidebar-ext" />
+          </a>
         </div>
       </div>
     </aside>
@@ -129,6 +151,10 @@ function Topbar({ current, pages, hrefFor }) {
 
   return (
     <header className="topbar">
+      <button className="nav-toggle" type="button" data-nav-toggle="true" aria-label="Open menu">
+        <List size={17} weight="bold" />
+        <span>Menu</span>
+      </button>
       <nav className="topbar-nav">
         <a href="/" className="crumb-link">
           Docs
@@ -162,7 +188,7 @@ function Topbar({ current, pages, hrefFor }) {
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "document.addEventListener('change',function(e){var t=e.target;if(t&&t.dataset.sectionSelect){var o=t.options[t.selectedIndex];if(o&&o.dataset.href)location.href=o.dataset.href}if(t&&t.dataset.pageSelect){location.href=t.value}})",
+              "document.addEventListener('change',function(e){var t=e.target;if(t&&t.dataset.sectionSelect){var o=t.options[t.selectedIndex];if(o&&o.dataset.href)location.href=o.dataset.href}if(t&&t.dataset.pageSelect){location.href=t.value}});document.addEventListener('click',function(e){var t=e.target;if(t.closest('[data-nav-toggle]'))document.body.classList.add('nav-open');if(t.closest('[data-nav-close]')||t.classList.contains('sidebar-backdrop'))document.body.classList.remove('nav-open')});document.addEventListener('keydown',function(e){if(e.key==='Escape')document.body.classList.remove('nav-open')})",
           }}
         />
       </nav>
@@ -363,6 +389,12 @@ function hashStr(s) {
 function Shell({ page, pages, hrefFor, bodyHtml, toc, isHome }) {
   return (
     <div className="shell">
+      <button
+        className="sidebar-backdrop"
+        type="button"
+        data-nav-close="true"
+        aria-label="Close menu"
+      />
       <SidebarNav pages={pages} hrefFor={hrefFor} current={page} />
       <header className="topbar-wrap">
         <Topbar current={page} pages={pages} hrefFor={hrefFor} />

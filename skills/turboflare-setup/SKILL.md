@@ -7,6 +7,16 @@ description: Set up Turboflare, the Cloudflare-native remote cache for Turborepo
 
 Help the user reach a verified remote cache hit quickly. Default to the smallest reliable setup: Cloudflare Worker, R2 bucket, and one Turbo bearer token. Do not introduce D1, KV, Analytics, Rate Limiting, custom domains, or lifecycle automation until the base cache works.
 
+Project links:
+
+- Docs: https://turboflare.vaishnav.one/
+- Repository: https://github.com/vaishnav-mk/turboflare
+- Bugs: https://github.com/vaishnav-mk/turboflare/issues/new?labels=bug
+- Feature requests: https://github.com/vaishnav-mk/turboflare/issues/new?labels=enhancement
+- Contact: https://x.com/wishee0
+
+Turboflare is alpha software. Make that clear in final reports: expect breaking changes and rough edges while it hardens.
+
 ## Outcome
 
 The setup is done only when all of these are true:
@@ -237,4 +247,6 @@ cache hits: <n>/<n>
 optional features tested: <list>
 cleanup: <what was purged/deleted>
 follow-ups: <only if needed>
+bugs/features: https://github.com/vaishnav-mk/turboflare/issues
+contact: https://x.com/wishee0
 ```

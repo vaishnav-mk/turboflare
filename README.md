@@ -8,9 +8,9 @@ Docs: <https://turboflare.vaishnav.one/>
 
 ## Alpha
 
-Turboflare is alpha software. Expect breaking changes, config changes, route changes, storage layout changes, and docs drift while the project hardens. Do not treat it as a stable Cloudflare product.
+Turboflare is alpha software. Expect breaking changes while it hardens. Do not treat it as a stable Cloudflare product.
 
-Use it if you are comfortable owning your deployment and reading the code when something breaks.
+Interested? DM [@wishee0](https://x.com/wishee0). Bugs and feature requests: [GitHub Issues](https://github.com/vaishnav-mk/turboflare/issues).
 
 ## What It Does
 
@@ -58,14 +58,11 @@ wrangler secret put TURBO_TOKEN --config apps/cache-worker/wrangler.jsonc
 
 `pnpm setup` is the guided source-checkout setup for contributors or customized deploys.
 
-## Useful Links
+## Links
 
 - Docs: <https://turboflare.vaishnav.one/>
 - Getting started: <https://turboflare.vaishnav.one/guide/getting-started/>
-- API reference: <https://turboflare.vaishnav.one/reference/api/>
-- Deployment guide: <https://turboflare.vaishnav.one/guide/deploy/>
-- Configuration: <https://turboflare.vaishnav.one/guide/configuration/>
-- Troubleshooting: <https://turboflare.vaishnav.one/guide/troubleshooting/>
+- Issues: <https://github.com/vaishnav-mk/turboflare/issues>
 
 ## Development
 

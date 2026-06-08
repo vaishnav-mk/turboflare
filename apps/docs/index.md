@@ -2,6 +2,14 @@
 
 Turborepo remote cache should be boring infrastructure: deploy it, set a token, point CI at it, and move on.
 
+## Alpha
+
+Turboflare is still in the works. Expect rough edges and breaking changes.
+
+- Interested in using it? DM [@wishee0](https://x.com/wishee0).
+- Found a bug? [Open a bug report](https://github.com/vaishnav-mk/turboflare/issues/new?labels=bug).
+- Want a feature? [Open a feature request](https://github.com/vaishnav-mk/turboflare/issues/new?labels=enhancement).
+
 ![Turboflare request flow](/diagrams/request-flow.svg)
 
 Quick context:
