@@ -26,6 +26,7 @@ try {
 }
 
 async function main() {
+  const setupStartedAt = Date.now();
   const config = JSON.parse(stripJsonComments(await readFile(CONFIG_PATH, "utf8")));
   const workerName = requiredString(config.name, "Worker name");
   const bucketName = requiredString(config.r2_buckets?.[0]?.bucket_name, "R2 bucket name");
@@ -107,6 +108,7 @@ async function main() {
   if (envWritten) {
     lines.push(`Local Turbo env written to ${DEFAULT_ENV_FILE}`);
   }
+  lines.push(`Total setup time: ${formatDuration(Date.now() - setupStartedAt)}`);
   printNote(lines.join("\n"), "Setup complete");
   finish("Turboflare is ready.");
 }
@@ -258,6 +260,7 @@ async function maybeVerifyTurboCache(workerUrl, team, token) {
 
   const tasks = turboTasks(await promptText("Turbo tasks to run", "build"));
   const env = { TURBO_API: workerUrl, TURBO_TEAM: team, TURBO_TOKEN: token };
+  const verifyStartedAt = Date.now();
   try {
     await run("pnpm", ["exec", "turbo", "--version"], {
       label: "Checking local Turbo install",
@@ -275,7 +278,10 @@ async function maybeVerifyTurboCache(workerUrl, team, token) {
     });
     assertTurboCacheHit(read);
     printNote(
-      "Turbo write/read check finished and the second run reported a remote cache hit.",
+      [
+        "Turbo write/read check finished and the second run reported a remote cache hit.",
+        `Turbo verification time: ${formatDuration(Date.now() - verifyStartedAt)}`,
+      ].join("\n"),
       "Turbo cache check complete",
     );
   } catch (error) {
@@ -283,6 +289,7 @@ async function maybeVerifyTurboCache(workerUrl, team, token) {
       [
         "Turboflare is deployed, but the optional local Turbo check did not complete.",
         "If this repo has not installed dependencies yet, run pnpm install and retry your Turbo command with the .env.turboflare values.",
+        `Turbo verification time before stop: ${formatDuration(Date.now() - verifyStartedAt)}`,
         error instanceof Error ? error.message : String(error),
       ].join("\n"),
       "Turbo cache check skipped",
@@ -405,4 +412,15 @@ async function exists(path) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function formatDuration(ms) {
+  const seconds = Math.round(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  if (minutes === 0) {
+    return `${remainingSeconds}s`;
+  }
+
+  return `${minutes}m ${remainingSeconds}s`;
 }

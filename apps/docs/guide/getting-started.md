@@ -35,7 +35,7 @@ It downloads Turboflare to a temporary directory, asks for the few values that c
 
 The generated `.env.turboflare` file is ignored by git.
 
-At the end, the installer can optionally run a real Turbo cache check for this repo. If you choose yes, it asks which Turbo tasks to run, writes to remote cache, removes `.turbo` to force a remote read, then runs the same tasks again. Only choose this if those tasks are safe to run now.
+At the end, the installer can optionally run a real Turbo cache check for this repo. If you choose yes, it asks which Turbo tasks to run, writes to remote cache, removes `.turbo` to force a remote read, then runs the same tasks again. It prints Turbo's output, verifies that the second run reports a remote `cache hit`, and shows how long setup and verification took. Only choose this if those tasks are safe to run now.
 
 ## What is `TURBO_TEAM`?
 
