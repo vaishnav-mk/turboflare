@@ -2,6 +2,12 @@
 
 Turboflare has two deploy paths: one-click deploy for quick setup, and manual Wrangler deploy for controlled environments.
 
+If you want Turboflare to ask questions and fill the standard values without keeping a source checkout, use clone-free setup instead:
+
+```sh
+pnpm dlx create-turboflare
+```
+
 ## One-click deploy
 
 Use the deploy button on the docs homepage or README.

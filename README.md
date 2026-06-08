@@ -22,7 +22,13 @@ Use it if you are comfortable owning your deployment and reading the code when s
 
 ## Quick Start
 
-Deploy with the button above, then set a Worker secret named `TURBO_TOKEN`.
+Clone-free guided setup:
+
+```sh
+pnpm dlx create-turboflare
+```
+
+Manual setup: deploy with the button above or from a source checkout, then set a Worker secret named `TURBO_TOKEN`.
 
 ```sh
 wrangler secret put TURBO_TOKEN --config apps/cache-worker/wrangler.jsonc
@@ -46,14 +52,15 @@ Manual deploy:
 
 ```sh
 pnpm install
-pnpm deploy
+pnpm setup
 ```
 
-`pnpm deploy` creates the configured R2 bucket if missing, then deploys the Worker.
+`pnpm setup` is for source checkouts and asks before deploying.
 
 ## Useful Links
 
 - Docs: <https://turboflare.vaishnav.one/>
+- Getting started: <https://turboflare.vaishnav.one/guide/getting-started/>
 - API reference: <https://turboflare.vaishnav.one/reference/api/>
 - Deployment guide: <https://turboflare.vaishnav.one/guide/deploy/>
 - Configuration: <https://turboflare.vaishnav.one/guide/configuration/>

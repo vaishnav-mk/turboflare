@@ -2,6 +2,14 @@
 
 Turboflare is used by setting standard Turbo remote cache environment variables.
 
+If you used `pnpm dlx create-turboflare` or source-checkout `pnpm setup`, these values are written to `.env.turboflare`:
+
+```sh
+set -a
+. ./.env.turboflare
+set +a
+```
+
 ## Basic setup
 
 ```sh

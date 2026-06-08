@@ -33,6 +33,20 @@ Ask at most one blocking question if mode is unclear. Otherwise inspect files an
 
 Use this path unless the user asks for advanced features.
 
+For normal users, prefer clone-free setup. Do not clone Turboflare into their app repo just to deploy it:
+
+```sh
+pnpm dlx create-turboflare
+```
+
+If the current repo is Turboflare itself, use the source-checkout guided setup script:
+
+```sh
+pnpm setup
+```
+
+Use the manual steps below when the guided script is not suitable, when it fails, or when the user wants every command controlled explicitly.
+
 1. Check tools and auth:
 
 ```sh
