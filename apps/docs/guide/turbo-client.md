@@ -2,7 +2,7 @@
 
 Turboflare is used by setting standard Turbo remote cache environment variables.
 
-If you used `pnpm dlx create-turboflare` or source-checkout `pnpm setup`, these values are written to `.env.turboflare`:
+If you used `pnpm dlx create-turboflare` or source-checkout `pnpm setup` and chose to write a local env file, load `.env.turboflare`:
 
 ```sh
 set -a
@@ -89,6 +89,8 @@ On the server, use:
 SIGNATURE_POLICY=require
 ```
 
+This rejects uploads missing Turbo's signature tag. Turbo clients still verify signed artifacts when restoring them.
+
 ## Branch-aware team names
 
 If branch policies are enabled, you can encode branch name in `TURBO_TEAM`:
@@ -98,6 +100,8 @@ export TURBO_TEAM="my-team@${GITHUB_HEAD_REF:-main}"
 ```
 
 When `BRANCH_CACHE_POLICY=shared`, Turboflare treats `my-team@branch` as a literal team name for compatibility. Branch parsing only activates when branch policies are enabled.
+
+Branch names are client-supplied. Do not treat branch policy as an auth boundary; use scoped/read-only tokens for untrusted PRs.
 
 ## Read-only remote cache
 

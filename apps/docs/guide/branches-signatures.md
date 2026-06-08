@@ -23,6 +23,8 @@ Branch sources:
 
 Explicit query/header branch wins over `team@branch`.
 
+Branch identity is client-supplied. Branch policies help namespace and restrict writes, but they are not an auth boundary. Use scoped or read-only tokens, and do not expose write tokens to untrusted PRs.
+
 ## Policy behavior
 
 | Policy               | Writes              | Reads                          | Use when                               |
@@ -77,4 +79,4 @@ export TURBO_REMOTE_CACHE_SIGNATURE_KEY="..."
 | `monitor` | emit metric when upload is unsigned     |
 | `require` | reject uploads missing `x-artifact-tag` |
 
-`require` checks for the Turbo signature tag. Turbo clients still verify signed artifacts when restoring them.
+`require` checks for the presence of Turbo's signature tag. Turboflare preserves the tag; Turbo clients still perform artifact verification when restoring signed cache entries.

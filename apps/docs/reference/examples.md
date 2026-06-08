@@ -63,7 +63,7 @@ BRANCH_RETENTION_DAYS=7
 
 ## Read-only PR cache
 
-For untrusted PRs, use a read-only token or server policy.
+For untrusted PRs, use a read-only token. Server branch policy is useful defense-in-depth, but branch names are client-supplied.
 
 Scoped token example:
 
@@ -109,6 +109,8 @@ CI env:
 env:
   TURBO_REMOTE_CACHE_SIGNATURE_KEY: ${{ secrets.TURBO_REMOTE_CACHE_SIGNATURE_KEY }}
 ```
+
+`SIGNATURE_POLICY=require` rejects uploads missing Turbo's signature tag. Turbo clients still verify signed artifacts on restore.
 
 ## Internal purge
 

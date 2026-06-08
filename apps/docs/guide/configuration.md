@@ -4,10 +4,10 @@ Turboflare is useful with only R2 and one bearer token. Everything else is optio
 
 ## Required
 
-| Name          | Type       | Purpose                                  |
-| ------------- | ---------- | ---------------------------------------- |
-| `ARTIFACTS`   | R2 binding | durable artifact storage                 |
-| `TURBO_TOKEN` | secret     | bearer token accepted from Turbo clients |
+| Name          | Type       | Purpose                                                        |
+| ------------- | ---------- | -------------------------------------------------------------- |
+| `ARTIFACTS`   | R2 binding | durable artifact storage                                       |
+| `TURBO_TOKEN` | secret     | bearer token accepted from Turbo clients in the smallest setup |
 
 Default R2 binding:
 
@@ -41,7 +41,7 @@ Default R2 binding:
 
 ## Metrics query variables
 
-Set these only if using `GET /internal/metrics/summary`:
+Set these only if using `GET /internal/metrics/summary`. Use your own Cloudflare account id; the default Worker config does not ship one.
 
 | Name                    | Purpose                                      |
 | ----------------------- | -------------------------------------------- |
@@ -74,8 +74,9 @@ These bindings are independent. The smallest production setup is still just `ART
 
 | Route                  | Method    | Auth           | Purpose             |
 | ---------------------- | --------- | -------------- | ------------------- |
+| `/`                    | `GET`     | none           | service label       |
 | `/management/health`   | `GET`     | none           | public health check |
-| `/v8/artifacts/status` | `GET`     | Turbo token    | cache status        |
+| `/v8/artifacts/status` | `GET`     | read scope     | cache status        |
 | `/v8/artifacts/:id`    | `PUT`     | write scope    | upload artifact     |
 | `/v8/artifacts/:id`    | `GET`     | read scope     | download artifact   |
 | `/v8/artifacts/:id`    | `HEAD`    | read scope     | metadata lookup     |
@@ -83,9 +84,12 @@ These bindings are independent. The smallest production setup is still just `ART
 | `/v8/artifacts/events` | `POST`    | read scope     | hit/miss events     |
 | `/v8/artifacts/events` | `GET`     | read scope     | empty event history |
 | `/v8/*`                | `OPTIONS` | none           | preflight response  |
-| `/v2/user`             | `GET`     | Turbo token    | Turbo compatibility |
-| `/v2/teams`            | `GET`     | Turbo token    | Turbo compatibility |
+| `/v2/user`             | `GET`     | read scope     | Turbo compatibility |
+| `/v2/teams`            | `GET`     | read scope     | Turbo compatibility |
+| `/v2/teams/:id`        | `GET`     | read scope     | Turbo compatibility |
 | `/internal/*`          | mixed     | internal token | admin operations    |
+
+D1 tokens can replace `TURBO_TOKEN` when `TOKEN_DB` is bound and populated. Static and D1 token auth can coexist.
 
 ## Cloudflare Pages or Workers Builds
 

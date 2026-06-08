@@ -21,21 +21,21 @@ pnpm dlx create-turboflare
 
 It downloads Turboflare to a temporary directory, asks for the few values that cannot be inferred, then deletes the temporary files after setup.
 
-| Step | What happens                                    |
-| ---- | ----------------------------------------------- |
-| 1    | checks Wrangler login                           |
-| 2    | downloads Turboflare to a temp directory        |
-| 3    | creates the configured R2 bucket if missing     |
-| 4    | deploys the Worker                              |
-| 5    | generates or accepts a `TURBO_TOKEN`            |
-| 6    | stores `TURBO_TOKEN` as a Worker secret         |
-| 7    | writes `.env.turboflare` in your app repo       |
-| 8    | checks health, unauthenticated status, and auth |
-| 9    | optionally runs a real Turbo write/read check   |
+| Step | What happens                                         |
+| ---- | ---------------------------------------------------- |
+| 1    | checks Wrangler login                                |
+| 2    | downloads Turboflare to a temp directory             |
+| 3    | creates the configured R2 bucket if missing          |
+| 4    | deploys the Worker                                   |
+| 5    | generates or accepts a `TURBO_TOKEN`                 |
+| 6    | stores `TURBO_TOKEN` as a Worker secret              |
+| 7    | optionally writes `.env.turboflare` in your app repo |
+| 8    | checks health, unauthenticated status, and auth      |
+| 9    | optionally runs a real Turbo write/read check        |
 
-The generated `.env.turboflare` file is ignored by git.
+If you write `.env.turboflare`, keep it out of git. Add `.env.turboflare` or `.env.*` to your app repo's ignore rules if needed.
 
-At the end, the installer can optionally run a real Turbo cache check for this repo. If you choose yes, it finds the nearest Turbo root, supports `turbo.json` and `turbo.jsonc`, uses the repo's package manager, asks which Turbo tasks to run, writes to remote cache, removes the configured local Turbo cache to force a remote read, then runs the same tasks again. It skips this check when `remoteCache.enabled=false`. It prints Turbo's output, verifies that the second run reports a remote `cache hit`, and shows how long setup and verification took. Only choose this if those tasks are safe to run now.
+At the end, the installer can optionally run a real Turbo cache check for this repo. If you choose yes, it finds the outermost Turbo root, supports `turbo.json` and `turbo.jsonc`, uses the repo's package manager, asks which Turbo tasks to run, writes to remote cache, removes the configured local Turbo cache to force a remote read, then runs the same tasks again. It skips this check when `remoteCache.enabled=false`. It prints Turbo's output with the token redacted, verifies that the second run reports a remote `cache hit`, and shows how long setup and verification took. Only choose this if those tasks are safe to run now.
 
 ## What is `TURBO_TEAM`?
 
@@ -181,4 +181,4 @@ Turboflare stores Turbo task cache artifacts for task hashes. It does not store 
 | retention     | R2 lifecycle enabled                                   |
 | admin         | separate `INTERNAL_ADMIN_TOKEN` if using `/internal/*` |
 | branch policy | keep `shared` unless you need PR isolation             |
-| signatures    | use `SIGNATURE_POLICY=require` for stricter CI         |
+| signatures    | require Turbo signature tags for stricter CI           |

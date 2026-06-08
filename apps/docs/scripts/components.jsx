@@ -134,11 +134,7 @@ function Topbar({ current, pages, hrefFor }) {
           Docs
         </a>
         <span className="crumb-sep">/</span>
-        <select
-          className="crumb-select"
-          defaultValue={currentSection}
-          onChange="var s=this.value;var o=this.querySelector('option[value=\\''+s+'\\']');if(o&&o.dataset.href)location.href=o.dataset.href"
-        >
+        <select className="crumb-select" defaultValue={currentSection} data-section-select="true">
           {sections.map((s) => {
             const first = pages.find((p) => p.section === s && !p.parent);
             return (
@@ -152,7 +148,7 @@ function Topbar({ current, pages, hrefFor }) {
         <select
           className="crumb-select crumb-page"
           defaultValue={hrefFor(current)}
-          onChange="location.href=this.value"
+          data-page-select="true"
         >
           {sectionPages.map((p) => {
             const group = p.children ? [p, ...p.children] : [p];
@@ -163,6 +159,12 @@ function Topbar({ current, pages, hrefFor }) {
             ));
           })}
         </select>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "document.addEventListener('change',function(e){var t=e.target;if(t&&t.dataset.sectionSelect){var o=t.options[t.selectedIndex];if(o&&o.dataset.href)location.href=o.dataset.href}if(t&&t.dataset.pageSelect){location.href=t.value}})",
+          }}
+        />
       </nav>
     </header>
   );

@@ -52,10 +52,11 @@ Manual deploy:
 
 ```sh
 pnpm install
-pnpm setup
+pnpm deploy
+wrangler secret put TURBO_TOKEN --config apps/cache-worker/wrangler.jsonc
 ```
 
-`pnpm setup` is for source checkouts and asks before deploying.
+`pnpm setup` is the guided source-checkout setup for contributors or customized deploys.
 
 ## Useful Links
 

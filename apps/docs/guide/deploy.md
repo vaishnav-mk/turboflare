@@ -108,12 +108,12 @@ Authenticated status:
 
 ```sh
 curl -H "Authorization: Bearer $TURBO_TOKEN" \
-  "$TURBO_API"
+  "$TURBO_API/v8/artifacts/status"
 ```
 
 Expected:
 
-The Worker should accept the matching Turbo token.
+The Worker should accept the matching Turbo token with `200`. Without auth, the same status route should return `401`.
 
 ## Deploy docs separately
 

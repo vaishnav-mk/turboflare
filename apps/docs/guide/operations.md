@@ -10,7 +10,7 @@ This page covers production knobs, admin routes, observability, and troubleshoot
 | token          | set `TURBO_TOKEN`, scoped tokens, or D1 tokens          |
 | internal admin | set `INTERNAL_ADMIN_TOKEN` only if using `/internal/*`  |
 | retention      | apply R2 lifecycle                                      |
-| signatures     | use `SIGNATURE_POLICY=require` for stricter CI          |
+| signatures     | require Turbo signature tags for stricter CI            |
 | branch policy  | keep `shared` unless PR isolation is needed             |
 | observability  | keep Worker observability enabled                       |
 | rate limits    | bind `RATE_LIMITER` for hosted/multi-tenant deployments |
@@ -50,7 +50,7 @@ Use it when you want admin/search/reporting features. Skip it for the smallest W
 
 Bind `ANALYTICS` to record non-blocking datapoints for status, preflight, upload, hit, miss, and event requests.
 
-Set these only if you want `/internal/metrics/summary` to query Analytics Engine from the Worker:
+Set these only if you want `/internal/metrics/summary` to query Analytics Engine from the Worker. Use the account id that owns the Analytics Engine table.
 
 | Variable                | Purpose                                      |
 | ----------------------- | -------------------------------------------- |

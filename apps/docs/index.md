@@ -2,6 +2,12 @@
 
 Turborepo remote cache should be boring infrastructure: deploy it, set a token, point CI at it, and move on.
 
+Turborepo hashes each task from its inputs, command, env, and outputs. A remote cache lets one machine upload the result for a task hash, then another machine restore that result instead of rebuilding it. This is most useful in CI, where fresh runners usually start with an empty local cache.
+
+The win can be large when task hashes match. In Turboflare's own CI run `27145453178`, the uncached comparison build step took `95s`; the cold Turbo seed/upload step took `94s`; the rebuild from remote cache took `2s`. That is the build step dropping from about a minute and a half to a couple seconds, because the second job restored cached outputs instead of recomputing them.
+
+Thanks to Vercel for making Turborepo and its remote cache protocol straightforward to use and self-host. If Vercel Remote Cache fits your project, use it; it is the easiest path. Turboflare is for the cases where you specifically want the cache Worker and artifacts in your own Cloudflare account.
+
 | Need                     | Turboflare gives you                                |
 | ------------------------ | --------------------------------------------------- |
 | Fast global reads        | Cloudflare Workers + optional Cache API             |
@@ -16,7 +22,7 @@ Turborepo remote cache should be boring infrastructure: deploy it, set a token, 
 | -------------------------------------- | ---------------------------------------------------------- |
 | PRs rebuilding the same packages       | restoring cached Turbo tasks from Cloudflare.              |
 | cache data that must stay in your org  | keeping artifacts in your R2 bucket with your own tokens.  |
-| open-source forks or untrusted PRs     | letting trusted branches write while PRs read safely.      |
+| open-source forks or untrusted PRs     | pairing read-only tokens with branch-aware cache policies. |
 | teams split across regions             | serving repeated reads from nearby Cloudflare PoPs.        |
 | too much infra for a build cache       | replacing cache servers with one Worker and one R2 bucket. |
 | client projects that cannot share data | namespacing each repo, customer, or branch independently.  |
@@ -41,8 +47,8 @@ pnpm dlx create-turboflare
 
 ```sh
 pnpm install
-wrangler secret put TURBO_TOKEN --config apps/cache-worker/wrangler.jsonc
 pnpm deploy
+wrangler secret put TURBO_TOKEN --config apps/cache-worker/wrangler.jsonc
 ```
 
 ```sh

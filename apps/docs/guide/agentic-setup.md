@@ -51,7 +51,7 @@ For a Turboflare source checkout:
 pnpm setup
 ```
 
-The guided setup should create or reuse the R2 bucket, deploy the Worker, set the Worker secret, write `.env.turboflare`, run health checks, and optionally run a real Turbo write/read verification.
+The guided setup should create or reuse the R2 bucket, deploy the Worker, set the Worker secret, optionally write `.env.turboflare`, run health checks, and optionally run a real Turbo write/read verification.
 
 ## Manual Verification
 
